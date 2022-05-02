@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "motrpac-backend-utils"
+version = "0.1.0"
+description = ""
+authors = ["Mihir Samdarshi <msamdars@stanford.edu>"]
+packages = [{include = "motrpac_backend_utils"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+protobuf = "^3.20.1"
+google-cloud-pubsub = "^2.12.0"
+
+[tool.poetry.dev-dependencies]
+"keyrings.google-artifactregistry-auth" = "^0.0.3"
+keyring = "^23.0.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
