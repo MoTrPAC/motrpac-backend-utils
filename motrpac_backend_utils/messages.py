@@ -1,24 +1,20 @@
 import logging
-from typing import List
+from typing import List, Optional
 
+from google.auth.transport.requests import AuthorizedSession
 from google.cloud.pubsub_v1 import PublisherClient
 
-from constants import NOTIFIER_CF_URL
-from proto.file_download_pb2 import FileDownloadMessage
-from proto.notification_pb2 import UserNotificationMessage
-from utils import get_authorized_session
-from zipper import Requester
-
+from . import get_authorized_session
+from .proto.file_download_pb2 import FileDownloadMessage
+from .proto.notification_pb2 import UserNotificationMessage
+from .zipper import Requester
 
 logger = logging.getLogger(__name__)
-
-publisher_client = PublisherClient()
-notifier_session = get_authorized_session(NOTIFIER_CF_URL)
 
 
 # pylint: disable=no-member
 def publish_file_download_message(
-    name: str, email: str, files: List[str], topic_id: str
+    name: str, email: str, files: List[str], topic_id: str, client: PublisherClient
 ):
     try:
         # Instantiate a protoc-generated class defined in `us-states.proto`.
@@ -31,7 +27,7 @@ def publish_file_download_message(
         msg_data = message.SerializeToString()
         logger.debug("Preparing a binary-encoded message:\n%s", msg_data)
 
-        future = publisher_client.publish(topic_id, msg_data)
+        future = client.publish(topic_id, msg_data)
         logger.info("Published message ID: %s", future.result())
     # pylint: disable=broad-except
     except Exception as e:
@@ -39,7 +35,12 @@ def publish_file_download_message(
 
 
 def send_notification_message(
-    name: str, email: str, output_path: str, manifest: List[str]
+    name: str,
+    email: str,
+    output_path: str,
+    manifest: List[str],
+    url: str,
+    session: Optional[AuthorizedSession] = None,
 ):
     """
     Publishes a message to the topic.
@@ -57,10 +58,10 @@ def send_notification_message(
         # serialize the message to bytes
         msg_data = message.SerializeToString()
 
-        notifier_session.post(
-            url=NOTIFIER_CF_URL,
-            data=msg_data,
-            headers={"Content-Type": "application/octet-stream"},
+        if session is None:
+            session = get_authorized_session(url)
+        session.post(
+            url=url, data=msg_data, headers={"Content-Type": "application/octet-stream"}
         )
 
     # pylint: disable=broad-except
