@@ -1,20 +1,28 @@
 import logging
+import os
 
 from google.cloud.logging import Client as LoggingClient
 from opentelemetry import trace
 from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.instrumentation.urllib3 import URLLib3Instrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.cloud_trace_propagator import CloudTraceFormatPropagator
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from constants import IS_PROD
+IS_PROD = bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0")))
 
 
 def setup_logging_and_tracing(log_level=logging.INFO):
-    # setup local logging/Google Cloud Logging
-    # setup local logging/Google Cloud Logging
+    """
+    Setup local logging/Google Cloud Logging and tracing. It reads an environment
+    variable called `PRODUCTION_DEPLOYMENT` to determine whether to send logs and
+    traces to the Google Cloud Logging and Google Cloud Tracing services. This can be
+    a boolean value, or a string that can be 0 or 1.
+
+    :param log_level: The log level to use. Defaults to logging.INFO
+    """
     log_format = "{levelname} {asctime} {name}:{funcName}:{lineno} {message}"
     logging.basicConfig(
         style="{", format=log_format, datefmt="%I:%M:%S %p", level=log_level
@@ -32,7 +40,10 @@ def setup_logging_and_tracing(log_level=logging.INFO):
     tracer_provider = TracerProvider()
     trace.set_tracer_provider(tracer_provider)
     RequestsInstrumentor().instrument()
+    URLLib3Instrumentor().instrument()
     if IS_PROD:
         trace_exporter = CloudTraceSpanExporter()
-        trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(trace_exporter))
+        trace.get_tracer_provider().add_span_processor(
+            BatchSpanProcessor(trace_exporter)
+        )
         set_global_textmap(CloudTraceFormatPropagator())

@@ -21,23 +21,14 @@ from psutil import virtual_memory
 from smart_open import open
 
 from ..messages import send_notification_message
-from utils import InProgressCache, Requester, get_path_dict
-from .constants import (
-    ACK_DEADLINE,
-    INPUT_BUCKET,
-    MAX_IN_PROGRESS,
-    OUTPUT_BUCKET,
-    SCRATCH_LOCATION,
-)
+from .utils import InProgressCache, Requester, get_path_dict
 
+
+MAX_IN_PROGRESS = os.cpu_count() - 3 or 1
 
 # setup local logging/Google Cloud Logging
 logger = logging.getLogger()
 tracer = trace.get_tracer(__name__)
-
-# Set up the location where files that we are zipping will be cached
-FILE_DL_CACHE = Path(f"{SCRATCH_LOCATION}/file_cache")
-FILE_DL_CACHE.mkdir(exist_ok=True)
 
 
 class ZipProcessResult(TypedDict):
@@ -75,6 +66,8 @@ def threadpool(f: Callable[P, R]) -> Callable[P, Future[R]]:
 def add_to_zip(
     tmp_dir: str,
     zip_loc: str,
+    output_bucket: str,
+    file_path_prefix: os.PathLike,
     queue: "JoinableQueue[Union[str, bool]]",
     processed_counter: Optional[Value],
 ) -> bool:
@@ -84,6 +77,8 @@ def add_to_zip(
 
     :param tmp_dir: The name of the local temporary directory
     :param zip_loc: The name of the zip file to be created
+    :param output_bucket: The name of the bucket to upload the final zip file to
+    :param file_path_prefix: The local path prefix to strip from the local file paths
     :param queue: A queue to communicate with the parent process
     :param processed_counter: A counter to keep track of how many files have been
     processed
@@ -98,7 +93,7 @@ def add_to_zip(
             os.getpid(),
         )
         # Process-local instance of the Storage client.
-        upload_buffer_size = 2 ** 8 * 256 * 1024
+        upload_buffer_size = 2**8 * 256 * 1024
 
         # Figure out how much memory we have available to allocate the new zip file
         memory = virtual_memory()
@@ -106,7 +101,7 @@ def add_to_zip(
         logger.debug(
             "[File Hash: %s] Allocating %s GB of memory for temp zip file",
             file_hash,
-            round(free_memory / (1024 ** 3), 4),
+            round(free_memory / (1024**3), 4),
         )
         manifest: List[str] = []
         storage_client = StorageClient()
@@ -127,7 +122,8 @@ def add_to_zip(
                         break
                     # create a file in the archive
                     archive.write(
-                        f, arcname=f.replace(f"{str(FILE_DL_CACHE).rstrip('/')}/", "")
+                        f,
+                        arcname=f.replace(f"{str(file_path_prefix).rstrip('/')}/", ""),
                     )
                     manifest.append(f)
                     queue.task_done()
@@ -155,7 +151,7 @@ def add_to_zip(
                 tmp_file.seek(0)
                 shutil.copyfileobj(tmp_file, gs_out, upload_buffer_size)
 
-            bucket = storage_client.get_bucket(OUTPUT_BUCKET)
+            bucket = storage_client.get_bucket(output_bucket)
             zip_blob = bucket.blob(os.path.basename(zip_loc))
             zip_blob.custom_time = datetime.now(timezone.utc)
             zip_blob.patch()
@@ -186,43 +182,75 @@ class ZipUploader:
     (also in Google Cloud Storage)
     """
 
-    files: List[str]
-    file_hash: str
-    full_output_path: str
-    requesters: Optional[List[Requester]]
-    tmp_dir_path: Path
-    storage_client: Optional[StorageClient]
-    queue: "Optional[JoinableQueue[Union[str, bool]]]"
-
     def __init__(
         self,
         files: List[str],
         file_hash: str,
+        storage_client: StorageClient,
+        input_bucket: str,
+        output_bucket: str,
+        notification_url: str,
+        scratch_location: Path = Path("/tmp"),
+        file_dl_location: Path = Path("/tmp/file_cache"),
         in_progress_cache: Optional[InProgressCache] = None,
         requesters: Optional[List[Requester]] = None,
-        storage_client: Optional[StorageClient] = None,
-        queue: "Optional[JoinableQueue[Union[str, bool]]]" = None,
         message: Optional[Message] = None,
+        ack_deadline: int = 600,
     ):
+        """
+        Initialize the ZipUploader class
+
+        :param files: A list of files to be zipped and uploaded to Google Cloud Storage
+        :param file_hash: The hash of the files to be zipped and uploaded. Ideally, the
+        file hash should be consistent to ensure that there are no namespace collisions.
+        Suggested naming for this hash is the hash of the concatenation of the file names
+        with some sort of delimiter (e.g. '_' or ',).
+        :param storage_client: A Google Cloud Storage client
+        :param input_bucket: The bucket where the files to be zipped are located
+        :param output_bucket: The bucket where the final zip file will be uploaded
+        :param notification_url: The URL to send a POST request with the notification
+        ProtoBuf message (encoded as bytes) when the zip file is uploaded
+        :param scratch_location: The location where temporary files will be stored
+        :param file_dl_location: The location where files will be downloaded to
+        :param in_progress_cache: An InProgressCache object to store the files that are
+        being processed. This is used to prevent duplicate work from being processed.
+        If this is not present, the `requesters` parameter must be provided.
+        :param requesters: A list of requesters to notify when the zip file is ready
+        :param message: If instantiating this class from a PubSub Pull subscription, this
+        is the message that was received from the subscription.
+        :param ack_deadline: If a message is present, this parameter is used to determine
+        the process needs to extend the acknowledgement deadline of the message. Set this
+        parameter to the acknowledgement deadline of the subscription. By default, it is
+        set to 600 seconds.
+        """
         self.files = files
         self.file_hash = file_hash
         # the file's requesters
         self.requesters = requesters
+        self.notification_url = notification_url
         self.in_progress_cache = in_progress_cache
+
+        if self.in_progress_cache is None and self.requesters is None:
+            raise ValueError("Either in_progress_cache or requesters must be specified")
 
         # Names output zip file based on the hash of the files
         self.output_path = f"{file_hash}.zip"
-        self.full_output_path = f"gs://{OUTPUT_BUCKET}/{self.output_path}"
+        self.full_output_path = f"gs://{output_bucket}/{self.output_path}"
         self.storage_client = storage_client
-        self.input_bucket = storage_client.get_bucket(INPUT_BUCKET)
-        self.output_bucket = storage_client.get_bucket(OUTPUT_BUCKET)
+        self.input_bucket = storage_client.get_bucket(input_bucket)
+        self.output_bucket = storage_client.get_bucket(output_bucket)
         # the queue to communicate with the separate zip file creation process
-        self.queue = queue
+        self.queue: "JoinableQueue[Union[str, bool]]" = JoinableQueue()
         self.message = message
+
+        # the location to store the files that are being downloaded/unzipped
+        self.file_dl_location = file_dl_location
+        self.tmp_dir_path = scratch_location.joinpath(Path(self.file_hash))
+
         if self.message is not None:
             deadline = datetime.fromtimestamp(message._received_timestamp)
             # set some attributes on the message for our own tracking use
-            setattr(message, "ack_deadline", ACK_DEADLINE)
+            setattr(message, "ack_deadline", ack_deadline)
             setattr(message, "ack_start_time", deadline)
 
         logger.debug("%s Initialized ZipUploader", self.log_prefix)
@@ -240,7 +268,7 @@ class ZipUploader:
         """
         logger.debug("%s Creating tmp directory", self.log_prefix)
         # the path to download the files to
-        self.tmp_dir_path = Path(f"{SCRATCH_LOCATION}/{self.file_hash}")
+        self.file_dl_location.mkdir(parents=True, exist_ok=True)
         self.tmp_dir_path.mkdir(parents=True, exist_ok=True)
 
     @threadpool
@@ -259,14 +287,14 @@ class ZipUploader:
             logger.debug(
                 "%s Fetching file info for %s",
                 self.log_prefix,
-                f"gs://{INPUT_BUCKET}/{dl_object}",
+                f"gs://{self.input_bucket.name}/{dl_object}",
             )
             # fetch files individually
             if blob is not None:
                 # get the base name for the file
                 blob_size = blob.size
                 name = Path(dl_object)
-                path = Path(FILE_DL_CACHE).joinpath(name).resolve()
+                path = Path(self.file_dl_location).joinpath(name).resolve()
                 path.parent.mkdir(parents=True, exist_ok=True)
 
                 # check if the file already exists
@@ -306,7 +334,14 @@ class ZipUploader:
         atomic_counter = Value("i", 0, lock=True)
         p = Process(
             target=add_to_zip,
-            args=(self.tmp_dir_path, self.full_output_path, self.queue, atomic_counter),
+            kwargs={
+                "tmp_dir": self.tmp_dir_path,
+                "zip_loc": self.full_output_path,
+                "output_bucket": self.output_bucket.name,
+                "file_path_prefix": self.file_dl_location,
+                "queue": self.queue,
+                "processed_counter": atomic_counter,
+            },
         )
         p.start()
 
@@ -404,7 +439,7 @@ class ZipUploader:
         if self.in_progress_cache is not None:
             self.in_progress_cache.finish_file(self.file_hash)
         return {
-            "outputBucket": OUTPUT_BUCKET,
+            "outputBucket": self.output_bucket.name,
             "outputPath": self.full_output_path,
             "manifest": self.files,
             "fileHash": self.file_hash,
@@ -416,13 +451,19 @@ class ZipUploader:
         Sends a notification to the user
         """
         if self.in_progress_cache is not None:
-            self.requesters = list(self.in_progress_cache.get_requesters(self.file_hash))
+            self.requesters = list(
+                self.in_progress_cache.get_requesters(self.file_hash)
+            )
         logger.debug("%s Sending notification to %s", self.log_prefix, self.requesters)
 
         if len(self.requesters) > 0:
             for requester in self.requesters:
                 send_notification_message(
-                    requester.name, requester.email, self.output_path, self.files
+                    requester.name,
+                    requester.email,
+                    self.output_path,
+                    self.files,
+                    self.notification_url,
                 )
 
     def notify_only(self):

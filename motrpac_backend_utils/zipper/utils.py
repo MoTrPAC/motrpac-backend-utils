@@ -268,5 +268,3 @@ def get_path_dict(paths: List[str]) -> dict:
                 marcher = marcher[key]
             marcher.setdefault("contents", []).append(parts[-1])
     return default_to_regular(new_path_dict)
-
-
