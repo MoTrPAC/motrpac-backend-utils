@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package fdl_svc;
+
+message FileDownloadMessage {
+  message Requester {
+    string email = 1;
+    string name = 2;
+  }
+
+  Requester requester = 1;
+  repeated string files = 2;
+}
