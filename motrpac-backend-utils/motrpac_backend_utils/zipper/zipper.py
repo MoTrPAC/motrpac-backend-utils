@@ -1,0 +1,455 @@
+import json
+import logging
+import os
+import shutil
+import time
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from copy import deepcopy
+from datetime import datetime, timezone
+from functools import wraps
+from multiprocessing import JoinableQueue, Process, Value
+from pathlib import Path
+from tempfile import SpooledTemporaryFile
+from typing import Callable, List, Optional, ParamSpec, TypedDict, TypeVar, Union
+from zipfile import ZIP_DEFLATED, ZipFile
+
+from google.cloud.pubsub_v1.subscriber.message import Message
+from google.cloud.storage import Client as StorageClient
+from math import ceil
+from opentelemetry import trace
+from psutil import virtual_memory
+from smart_open import open
+
+from messages import send_notification_message
+from zipper_utils import InProgressCache, Requester, get_path_dict
+from .constants import (
+    ACK_DEADLINE,
+    INPUT_BUCKET,
+    MAX_IN_PROGRESS,
+    OUTPUT_BUCKET,
+    SCRATCH_LOCATION,
+)
+
+
+# setup local logging/Google Cloud Logging
+logger = logging.getLogger()
+tracer = trace.get_tracer(__name__)
+
+# Set up the location where files that we are zipping will be cached
+FILE_DL_CACHE = Path(f"{SCRATCH_LOCATION}/file_cache")
+FILE_DL_CACHE.mkdir(exist_ok=True)
+
+
+class ZipProcessResult(TypedDict):
+    """
+    A dictionary that contains a summary of details regarding the results of a zip process
+    """
+
+    outputBucket: str
+    outputPath: str
+    manifest: List[str]
+    fileHash: str
+    requesters: Optional[List[str]]
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+_DEFAULT_POOL = ThreadPoolExecutor()
+
+
+def threadpool(f: Callable[P, R]) -> Callable[P, Future[R]]:
+    """
+    Decorator that wraps a function and runs it in a threadpool.
+    :param f: The function to wrap
+    :return: The wrapped function
+    """
+
+    @wraps(f)
+    def wrap(*args, **kwargs) -> Future[R]:
+        return _DEFAULT_POOL.submit(f, *args, **kwargs)
+
+    return wrap
+
+
+def add_to_zip(
+    tmp_dir: str,
+    zip_loc: str,
+    queue: "JoinableQueue[Union[str, bool]]",
+    processed_counter: Optional[Value],
+) -> bool:
+    """
+    Adds files to an archive, working asynchronously, with another process which will
+    tell it which files to process, and when it is done.
+
+    :param tmp_dir: The name of the local temporary directory
+    :param zip_loc: The name of the zip file to be created
+    :param queue: A queue to communicate with the parent process
+    :param processed_counter: A counter to keep track of how many files have been
+    processed
+    :returns: True when the process has finished (there are no more messages to process/
+    the queue has delivered a sentinel boolean value of False)
+    """
+    file_hash = os.path.basename(os.path.splitext(zip_loc)[0])
+    with tracer.start_as_current_span(file_hash):
+        logger.debug(
+            "[File Hash: %s] Spawned local zip file creator child process, PID: %s",
+            file_hash,
+            os.getpid(),
+        )
+        # Process-local instance of the Storage client.
+        upload_buffer_size = 2 ** 8 * 256 * 1024
+
+        # Figure out how much memory we have available to allocate the new zip file
+        memory = virtual_memory()
+        free_memory = int(memory.available / MAX_IN_PROGRESS)
+        logger.debug(
+            "[File Hash: %s] Allocating %s GB of memory for temp zip file",
+            file_hash,
+            round(free_memory / (1024 ** 3), 4),
+        )
+        manifest: List[str] = []
+        storage_client = StorageClient()
+
+        # A spooled zip file exists in memory, and is written to disk when it reaches a
+        # certain size, which is what we allocated above
+        with SpooledTemporaryFile(max_size=free_memory, dir=tmp_dir) as tmp_file:
+            with ZipFile(tmp_file, mode="w", compression=ZIP_DEFLATED) as archive:
+                while True:
+                    # get the latest message from the shared process queue
+                    f = queue.get()
+                    logger.debug(
+                        "[File Hash: %s] Received message from queue %s", file_hash, f
+                    )
+                    # sentinel to tell the multiprocessing to stop processing
+                    if type(f) == bool and not f:
+                        queue.task_done()
+                        break
+                    # create a file in the archive
+                    archive.write(
+                        f, arcname=f.replace(f"{str(FILE_DL_CACHE).rstrip('/')}/", "")
+                    )
+                    manifest.append(f)
+                    queue.task_done()
+                    if processed_counter is not None:
+                        with processed_counter.get_lock():
+                            processed_counter.value += 1
+                    logger.debug("[File Hash: %s] Finished archiving %s", file_hash, f)
+
+                manifest_fn = f"{file_hash}.nested.manifest.json"
+                archive.writestr(
+                    manifest_fn, json.dumps(get_path_dict(manifest), indent=2)
+                )
+                manifest_fn = f"{file_hash}.list.manifest.json"
+                archive.writestr(manifest_fn, json.dumps(manifest, indent=2))
+
+            with open(
+                zip_loc,
+                mode="wb",
+                transport_params={
+                    "min_part_size": upload_buffer_size,
+                    "client": storage_client,
+                },
+            ) as gs_out:
+                # reset the file pointer to the beginning of the file
+                tmp_file.seek(0)
+                shutil.copyfileobj(tmp_file, gs_out, upload_buffer_size)
+
+            bucket = storage_client.get_bucket(OUTPUT_BUCKET)
+            zip_blob = bucket.blob(os.path.basename(zip_loc))
+            zip_blob.custom_time = datetime.now(timezone.utc)
+            zip_blob.patch()
+
+        return True
+
+
+def estimate_remaining_time(
+    current_file_count: int, total_file_count: int, elapsed_time: float
+) -> int:
+    """
+    Estimate the remaining time for the current file to be processed.
+    :param current_file_count: The number of files that have been processed
+    :param total_file_count: The total number of files to be processed
+    :param elapsed_time: The time since the process started
+    """
+    # calculate the estimated time remaining
+    remaining_time = (elapsed_time / current_file_count) * (
+        total_file_count - current_file_count
+    )
+
+    return min(ceil(remaining_time * 1.5), 600)
+
+
+class ZipUploader:
+    """
+    A class to create and upload a zip file to Google Cloud Storage from a list of files
+    (also in Google Cloud Storage)
+    """
+
+    files: List[str]
+    file_hash: str
+    full_output_path: str
+    requesters: Optional[List[Requester]]
+    tmp_dir_path: Path
+    storage_client: Optional[StorageClient]
+    queue: "Optional[JoinableQueue[Union[str, bool]]]"
+
+    def __init__(
+        self,
+        files: List[str],
+        file_hash: str,
+        in_progress_cache: Optional[InProgressCache] = None,
+        requesters: Optional[List[Requester]] = None,
+        storage_client: Optional[StorageClient] = None,
+        queue: "Optional[JoinableQueue[Union[str, bool]]]" = None,
+        message: Optional[Message] = None,
+    ):
+        self.files = files
+        self.file_hash = file_hash
+        # the file's requesters
+        self.requesters = requesters
+        self.in_progress_cache = in_progress_cache
+
+        # Names output zip file based on the hash of the files
+        self.output_path = f"{file_hash}.zip"
+        self.full_output_path = f"gs://{OUTPUT_BUCKET}/{self.output_path}"
+        self.storage_client = storage_client
+        self.input_bucket = storage_client.get_bucket(INPUT_BUCKET)
+        self.output_bucket = storage_client.get_bucket(OUTPUT_BUCKET)
+        # the queue to communicate with the separate zip file creation process
+        self.queue = queue
+        self.message = message
+        if self.message is not None:
+            deadline = datetime.fromtimestamp(message._received_timestamp)
+            # set some attributes on the message for our own tracking use
+            setattr(message, "ack_deadline", ACK_DEADLINE)
+            setattr(message, "ack_start_time", deadline)
+
+        logger.debug("%s Initialized ZipUploader", self.log_prefix)
+
+    @property
+    def log_prefix(self):
+        """
+        A prefix to use for logging statements
+        """
+        return f"[File Hash: {self.file_hash}]"
+
+    def setup_processing(self):
+        """
+        Set up processing the zip file
+        """
+        logger.debug("%s Creating tmp directory", self.log_prefix)
+        # the path to download the files to
+        self.tmp_dir_path = Path(f"{SCRATCH_LOCATION}/{self.file_hash}")
+        self.tmp_dir_path.mkdir(parents=True, exist_ok=True)
+
+    @threadpool
+    def get_file(self, dl_object: str) -> Optional[Path]:
+        """
+        Downloads a file from Google Cloud Storage to the local filesystem, returns early
+        if the file already exists, pauses if the file is currently being downloaded
+
+        :param dl_object: The filename of the file to download (with path style
+        gs://bucket/path/to/file)
+        :return: The local path to the file
+        """
+        with tracer.start_as_current_span(dl_object):
+            blob = self.input_bucket.get_blob(dl_object)
+            # parse the bucket and path from each file in the request
+            logger.debug(
+                "%s Fetching file info for %s",
+                self.log_prefix,
+                f"gs://{INPUT_BUCKET}/{dl_object}",
+            )
+            # fetch files individually
+            if blob is not None:
+                # get the base name for the file
+                blob_size = blob.size
+                name = Path(dl_object)
+                path = Path(FILE_DL_CACHE).joinpath(name).resolve()
+                path.parent.mkdir(parents=True, exist_ok=True)
+
+                # check if the file already exists
+                if path.exists():
+                    logger.debug("%s File already exists at %s", self.log_prefix, path)
+                    # does size of remote and local file match (the file may be currently
+                    # downloading)
+                    if path.stat().st_size < blob_size:
+                        logger.debug(
+                            "%s Waiting for other process to download %s",
+                            self.log_prefix,
+                            path,
+                        )
+                    # if it does exist but is currently downloading, wait
+                    while path.stat().st_size < blob_size:
+                        time.sleep(1)
+                    logger.debug(
+                        "%s Other process finished downloading %s",
+                        self.log_prefix,
+                        path,
+                    )
+                    return path
+                else:
+                    logger.debug("%s Downloading file to %s", self.log_prefix, path)
+                    blob.download_to_filename(str(path))
+                    return path
+
+    def create_zip(self):
+        """
+        Creates an async iterator that will yield the files in the zip archive
+        """
+        futures: List[Future[Path]] = []
+
+        for file in self.files:
+            futures.append(self.get_file(file))
+
+        atomic_counter = Value("i", 0, lock=True)
+        p = Process(
+            target=add_to_zip,
+            args=(self.tmp_dir_path, self.full_output_path, self.queue, atomic_counter),
+        )
+        p.start()
+
+        for i, fut in enumerate(as_completed(futures)):
+            tmp_file_path = str(fut.result())
+            self.queue.put(tmp_file_path)
+            logger.debug(
+                "%s Finished downloading file %s", self.log_prefix, tmp_file_path
+            )
+            # check if the time is getting dangerously close to the timeout
+            if self.message is not None:
+                self.check_message_deadline(i)
+
+        # wait for the add to zip process to finish`
+        while True:
+            time.sleep(5)
+            with atomic_counter.get_lock():
+                current_num_files = int(deepcopy(atomic_counter.value))
+            logger.debug(
+                "%s Process counter is at %s / %s",
+                self.log_prefix,
+                current_num_files,
+                len(self.files),
+            )
+            if self.message is not None:
+                self.check_message_deadline(current_num_files)
+            # break if the queue is empty (process is about to finish)
+            if self.queue.empty():
+                break
+
+        self.cleanup_create_zip(p)
+
+    def check_message_deadline(self, current_num_files):
+        """
+        Checks if the message is about to expire, and modifies the message if it is
+
+        :param current_num_files: The number of files that have been downloaded/processed
+        """
+        # calculate the time elapsed since the process started
+        elapsed_time = (datetime.now() - self.message.ack_start_time).total_seconds()
+        logger.debug(
+            "%s Elapsed time/ack deadline threshold: %s seconds / %s seconds",
+            self.log_prefix,
+            elapsed_time,
+            self.message.ack_deadline * 0.75,
+        )
+        # check if the time is getting dangerously close to the timeout
+        if elapsed_time > (self.message.ack_deadline * 0.75):
+            new_deadline = estimate_remaining_time(
+                current_num_files, len(self.files), elapsed_time
+            )
+            logger.debug(
+                "%s Modifying ack deadline to %s seconds from now",
+                self.log_prefix,
+                new_deadline,
+            )
+            self.message.modify_ack_deadline(new_deadline)
+            # reset the start time and new ack deadline
+            setattr(self.message, "ack_deadline", new_deadline)
+            setattr(self.message, "ack_start_time", datetime.now())
+
+    def cleanup_create_zip(self, proc: Process):
+        """
+        Closes/joins the queue and zip file creation process
+        """
+        self.queue.put(False)
+        self.queue.join()
+        self.queue.close()
+        self.queue.join_thread()
+        proc.join()
+
+    def check_zip_exists_in_bucket(self):
+        """
+        Verifies that the zip archive exists in the Google Cloud Storage Bucket
+
+        :return: Whether the file exists
+        """
+        logger.debug(
+            "%s Confirming existence of zip file at %s",
+            self.log_prefix,
+            self.full_output_path,
+        )
+
+        output_blob = self.output_bucket.get_blob(self.output_path)
+        if output_blob is None:
+            raise FileNotFoundError("Zip file does not exist in bucket")
+
+    def successful_result(self) -> ZipProcessResult:
+        """
+        Returns the output from the result of the zip file
+
+        :return: The result of the file processing
+        """
+        logger.info("%s Processed %s", self.log_prefix, self.full_output_path)
+        if self.in_progress_cache is not None:
+            self.in_progress_cache.finish_file(self.file_hash)
+        return {
+            "outputBucket": OUTPUT_BUCKET,
+            "outputPath": self.full_output_path,
+            "manifest": self.files,
+            "fileHash": self.file_hash,
+            "requesters": [r.to_str() for r in self.requesters],
+        }
+
+    def send_notification(self):
+        """
+        Sends a notification to the user
+        """
+        if self.in_progress_cache is not None:
+            self.requesters = list(self.in_progress_cache.get_requesters(self.file_hash))
+        logger.debug("%s Sending notification to %s", self.log_prefix, self.requesters)
+
+        if len(self.requesters) > 0:
+            for requester in self.requesters:
+                send_notification_message(
+                    requester.name, requester.email, self.output_path, self.files
+                )
+
+    def notify_only(self):
+        """
+        Only notifies the users that have requested the file.
+
+        :return:
+        """
+        self.send_notification()
+        self.successful_result()
+
+    def process_and_notify_requesters(self):
+        """
+        Processes the request, constructs the zip archive to the storage bucket
+        """
+        with tracer.start_as_current_span(self.file_hash):
+            try:
+                t1 = time.perf_counter()
+                logger.info("%s Begin processing", self.log_prefix)
+                self.setup_processing()
+                self.create_zip()
+                self.check_zip_exists_in_bucket()
+                self.send_notification()
+                self.successful_result()
+                t2 = time.perf_counter()
+                logger.info("%s REQUEST TIMER: %s seconds", self.log_prefix, t2 - t1)
+            except Exception as e:
+                if self.tmp_dir_path:
+                    shutil.rmtree(self.tmp_dir_path)
+                raise Exception from e

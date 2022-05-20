@@ -1,41 +1,48 @@
-import logging
 import os
 from hashlib import md5
-from typing import List, Tuple
+from typing import List
 
-from google.pubsub_v1 import PublisherClient
-
-import pubsub_pb2
-
-logger = logging.getLogger()
-publisher_client = PublisherClient()
+import google.auth
+from google.auth.compute_engine import IDTokenCredentials
+from google.auth.transport.requests import AuthorizedSession, Request
 
 
-def parse_bucket_path(path: str) -> Tuple[str, str]:
+def get_env(key: str, default: str = None) -> str:
     """
-    Split a full GCS path in bucket and key strings.
-    'gs://bucket/key' -> ('bucket', 'key')
+    Gets an environment variable, or either returns a default value or throws an error
+    if it is not set
 
-    :param path: GCS path (e.g. gs://bucket/key).
-    :return: Tuple of bucket and key strings
+    :param key: The name of the environment variable
+    :param default: The default value to return if the environment variable is not set
+    :raise ValueError: If the specified environment variable cannot be found
+    :return: The environment variable
     """
-    if path.startswith("gs://") is True:
-        parts = path.replace("gs://", "").split("/", 1)
+    value = os.getenv(key, default)
+    if value is None:
+        raise ValueError(f"{key} environment variable is missing, please set it")
+    return value
+
+
+def get_authorized_session(
+    audience: str, max_refresh_attempts: int = 100
+) -> AuthorizedSession:
+    """
+    Returns a AuthorizedSession (a Request object with the appropriate
+    Authorization  headers) for the user to use to make requests to Google services with
+
+    :param audience: Used when running in compute engine, this is the HTTP endpoint of
+    the service being accessed
+    :param max_refresh_attempts: The maximum number of times to attempt refreshing the
+    credentials
+    :return: An AuthorizedSession instance to use to make requests to Google services
+    """
+    if bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0"))):
+        request = Request()
+        credentials = IDTokenCredentials(request=request, target_audience=audience)
     else:
-        raise ValueError(f"{path} is not a valid path. It MUST start with 'gs://'")
+        credentials, _ = google.auth.default()
 
-    bucket: str = parts[0]
-
-    if bucket == "":
-        raise ValueError("Empty bucket name received")
-    if "/" in bucket or bucket == " ":
-        raise ValueError(f"'{bucket}' is not a valid bucket name.")
-
-    key: str = ""
-    if len(parts) == 2:
-        key = key if parts[1] is None else parts[1]
-
-    return bucket, key
+    return AuthorizedSession(credentials, max_refresh_attempts=max_refresh_attempts)
 
 
 def generate_file_hash(files: List[str]):
@@ -53,35 +60,3 @@ def generate_file_hash(files: List[str]):
 
     return sorted_files, md5_hash
 
-
-def get_env(key: str) -> str:
-    """
-    Gets an environment variable, or throws an error if it is not set
-
-    :param key: The name of the environment variable
-    :raise ValueError: If the specified environment variable cannot be found
-    :return: The environment variable
-    """
-    value = os.getenv(key)
-    if value is None:
-        raise ValueError(f"{key} environment variable is missing, please set it")
-    return value
-
-
-def publish_message(requester: str, files: List[str], metadata: dict):
-    try:
-        # Instantiate a protoc-generated class defined in `us-states.proto`.
-        message = pubsub_pb2.FileDownloadMessage()
-        message.files = files
-        message.metadata = metadata
-        message.requester = requester
-
-        # Encode the data according to the message serialization type.
-        data = message.SerializeToString()
-        print(f"Preparing a binary-encoded message:\n{data}")
-
-        future = publisher_client.publish(TOPIC_ID, data)
-        print(f"Published message ID: {future.result()}")
-
-    except Exception as e:
-        logger.error(f"Exception occurred while publishing message: {e}")
