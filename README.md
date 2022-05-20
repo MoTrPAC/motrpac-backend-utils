@@ -6,7 +6,7 @@ This package provides code used across multiple services in the MoTrPAC backend.
 
 This package is created using the Poetry package manager.
 
-It is hosted in a private Google Artifact Registry called `motrpac-portal-dev-py`.
+It is hosted in a private Google Artifact Registry.
 
 ### Getting Started
 
@@ -33,9 +33,9 @@ Then you can generate the settings that you need to add to certain local files i
 registry:
 
 ```bash
-gcloud artifacts print-settings python --project=motrpac-portal-dev \
-    --repository=motrpac-portal-dev-py \
-    --location=us-west2
+gcloud artifacts print-settings python --project=<project> \
+    --repository=<repository> \
+    --location=<region>
 ```
 
 Your `pip.conf` should be located in the virtualenv created by Poetry
@@ -60,5 +60,5 @@ Python:   /Users/user/.pyenv/versions/3.9.10
 
 ```bash
 poetry build
-twine upload --repository-url https://us-west2-python.pkg.dev/motrpac-portal-dev/motrpac-portal-dev-py/ dist/*
+twine upload --repository-url https://<region>-python.pkg.dev/<project>/<repo>/ dist/*
 ```
