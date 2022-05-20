@@ -4,8 +4,8 @@ from typing import List
 from google.cloud.pubsub_v1 import PublisherClient
 
 from constants import NOTIFIER_CF_URL
-from file_download_pb2 import FileDownloadMessage
-from notification_pb2 import UserNotificationMessage
+from proto.file_download_pb2 import FileDownloadMessage
+from proto.notification_pb2 import UserNotificationMessage
 from utils import get_authorized_session
 from zipper import Requester
 

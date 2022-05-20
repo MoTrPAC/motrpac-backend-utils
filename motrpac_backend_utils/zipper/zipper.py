@@ -20,8 +20,8 @@ from opentelemetry import trace
 from psutil import virtual_memory
 from smart_open import open
 
-from messages import send_notification_message
-from zipper_utils import InProgressCache, Requester, get_path_dict
+from ..messages import send_notification_message
+from utils import InProgressCache, Requester, get_path_dict
 from .constants import (
     ACK_DEADLINE,
     INPUT_BUCKET,

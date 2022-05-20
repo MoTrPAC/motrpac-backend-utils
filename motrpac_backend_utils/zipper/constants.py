@@ -1,6 +1,6 @@
 import os
 
-from utils import get_env
+from ..utils import get_env
 
 
 # the fully qualified topic name (e.g. project/project_id/topics/topic_id)

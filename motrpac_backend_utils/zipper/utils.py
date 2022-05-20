@@ -3,8 +3,8 @@ from collections import defaultdict
 from multiprocessing import Array, Value
 from typing import Any, DefaultDict, List, NamedTuple, Set, Type, TypeVar, Union
 
-from file_download_pb2 import FileDownloadMessage
-from notification_pb2 import UserNotificationMessage
+from ..proto.file_download_pb2 import FileDownloadMessage
+from ..proto.notification_pb2 import UserNotificationMessage
 
 
 class LastMessage:
