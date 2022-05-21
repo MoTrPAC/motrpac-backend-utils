@@ -23,6 +23,7 @@ requests = "^2.24.0"
 smart-open = "^6.0.0"
 
 [tool.poetry.dev-dependencies]
+mypy-protobuf = "^3.2.0"
 "keyrings.google-artifactregistry-auth" = "^0.0.3"
 keyring = "^23.0.1"
 twine = "^4.0.0"
