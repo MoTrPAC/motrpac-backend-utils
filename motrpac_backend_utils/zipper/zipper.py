@@ -93,7 +93,7 @@ def add_to_zip(
             os.getpid(),
         )
         # Process-local instance of the Storage client.
-        upload_buffer_size = 2**8 * 256 * 1024
+        upload_buffer_size = 2 ** 8 * 256 * 1024
 
         # Figure out how much memory we have available to allocate the new zip file
         memory = virtual_memory()
@@ -101,7 +101,7 @@ def add_to_zip(
         logger.debug(
             "[File Hash: %s] Allocating %s GB of memory for temp zip file",
             file_hash,
-            round(free_memory / (1024**3), 4),
+            round(free_memory / (1024 ** 3), 4),
         )
         manifest: List[str] = []
         storage_client = StorageClient()
@@ -186,10 +186,10 @@ class ZipUploader:
         self,
         files: List[str],
         file_hash: str,
-        storage_client: StorageClient,
-        input_bucket: str,
-        output_bucket: str,
         notification_url: str,
+        storage_client: Optional[StorageClient] = None,
+        input_bucket: Optional[str] = None,
+        output_bucket: Optional[str] = None,
         scratch_location: Path = Path("/tmp"),
         file_dl_location: Path = Path("/tmp/file_cache"),
         in_progress_cache: Optional[InProgressCache] = None,
@@ -198,7 +198,9 @@ class ZipUploader:
         ack_deadline: int = 600,
     ):
         """
-        Initialize the ZipUploader class
+        Initialize the ZipUploader class. This has two functionalities: one to both create
+        and upload a zip file to Google Cloud Storage, and one to just notify the
+        requester, if the zip file was already created by the zip class.
 
         :param files: A list of files to be zipped and uploaded to Google Cloud Storage
         :param file_hash: The hash of the files to be zipped and uploaded. Ideally, the
@@ -225,20 +227,26 @@ class ZipUploader:
         """
         self.files = files
         self.file_hash = file_hash
+
+        # the url to push the notification URL to
+        self.notification_url = notification_url
+
         # the file's requesters
         self.requesters = requesters
-        self.notification_url = notification_url
         self.in_progress_cache = in_progress_cache
-
         if self.in_progress_cache is None and self.requesters is None:
             raise ValueError("Either in_progress_cache or requesters must be specified")
 
         # Names output zip file based on the hash of the files
         self.output_path = f"{file_hash}.zip"
         self.full_output_path = f"gs://{output_bucket}/{self.output_path}"
+
+        # set up the storage client and input/output buckets
         self.storage_client = storage_client
-        self.input_bucket = storage_client.get_bucket(input_bucket)
-        self.output_bucket = storage_client.get_bucket(output_bucket)
+        if self.storage_client is not None:
+            self.input_bucket = storage_client.get_bucket(input_bucket)
+            self.output_bucket = storage_client.get_bucket(output_bucket)
+
         # the queue to communicate with the separate zip file creation process
         self.queue: "JoinableQueue[Union[str, bool]]" = JoinableQueue()
         self.message = message
@@ -247,6 +255,8 @@ class ZipUploader:
         self.file_dl_location = file_dl_location
         self.tmp_dir_path = scratch_location.joinpath(Path(self.file_hash))
 
+        # the message from the PubSub pull subscription if that is the source of the
+        # ZipUploader
         if self.message is not None:
             deadline = datetime.fromtimestamp(message._received_timestamp)
             # set some attributes on the message for our own tracking use
