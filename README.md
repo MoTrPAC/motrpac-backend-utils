@@ -1,14 +1,12 @@
-# Packages
-
-## MoTrPAC Backend Utils
+# MoTrPAC Backend Utils
 
 This package provides code used across multiple services in the MoTrPAC backend.
 
 This package is created using the Poetry package manager.
 
-### Getting Started
+## Getting Started
 
-#### Structure
+### Structure
 
 ```bash
 ├── motrpac_backend_utils
@@ -30,28 +28,28 @@ This package is created using the Poetry package manager.
 └── .gitignore
 ```
 
-##### `/proto`
+#### `/proto`
 
 The `proto` directory contains the protobuf files used by the backend.
 
-##### `/motrpac_backend_utils/proto/`
+#### `/motrpac_backend_utils/proto/`
 
 This folder contains auto-generated Python code for the protobuf files located in `/proto`
 
 In addition, it contains the Python type definitions for the auto-generated Python files, located in the `*.pyi` files
 
-##### `/motrpac_backend_utils/setup.py`
+#### `/motrpac_backend_utils/setup.py`
 
 This contains functions for initializing Google Cloud Logging and Google Cloud Tracing.
 
 It reads an environment variable called `PRODUCTION_DEPLOYMENT` to determine whether to send logs and traces to the
 Google Cloud Logging and Google Cloud Tracing services. This can be a boolean value, or a string that can be 0 or 1.
 
-### Google Artifact Registry
+## Google Artifact Registry
 
 It is hosted in a private Google Artifact Registry.
 
-#### Getting Started
+### Getting Started
 
 First install all dependencies
 
