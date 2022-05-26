@@ -4,7 +4,13 @@ import os
 from concurrent.futures import ThreadPoolExecutor, Future
 from functools import wraps
 from hashlib import md5
-from typing import List, ParamSpec, TypeVar, Callable
+from typing import List, TypeVar, Callable
+import sys
+
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+else:
+    from typing_extensions import ParamSpec
 
 import google.auth
 from google.auth.compute_engine import IDTokenCredentials
