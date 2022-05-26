@@ -8,6 +8,44 @@ This package is created using the Poetry package manager.
 
 ## Getting Started
 
+### Requirements
+
+A Makefile is provided for your convenience.
+
+To get started, run the following command:
+
+```bash
+make init
+```
+
+This will check you have Poetry installed and will install the dependencies. It will error if you don't have
+the `protoc` compiler installed. This is a non-fatal error, if you are not going to be re-generating protobuf files, you
+can ignore this.
+
+#### Protobuf
+
+Install the latest version of the `protoc` compiler:
+
+##### macOS
+
+```bash
+brew install protobuf
+```
+
+*Note: as of 5/26/22 `protoc` has not been updated to the latest version on Homebrew, so you will need to manually
+install it using the instructions below*
+
+##### Manual Install
+
+```bash
+PROTOC_VERSION=21.0
+PROTOC_ZIP=protoc-$PROTOC_VERSION-{REPLACE BRACKETS WITH YOUR PLATFORM (i.e. win64, osx, or linux}-$(uname -m).zip
+curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_ZIP
+sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
+sudo unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
+rm -f $PROTOC_ZIP
+```
+
 ### Structure
 
 ```bash
@@ -16,9 +54,11 @@ This package is created using the Poetry package manager.
 │   │   ├── *_pb2.py
 │   │   └── *_pb2.pyi
 │   ├── zipper
+│   │   ├── cache.py # functions for caching requests/other info used by the zipper
 │   │   ├── utils.py # utility functions used by the zipper
 │   │   └── zipper.py # the zipper class
 │   ├── messages.py # contains functions for messaging in the backend
+│   ├── requester.py # contains Requester class
 │   ├── setup.py # contains functions for setting up the backend (tracing and logging)
 │   └── utils.py # utility functions used by the backend
 ├── proto
@@ -89,7 +129,6 @@ pip install -e  "git+https://github.com/MoTrPAC/motrpac-backend-utils.git#egg=mo
 
 If using any of the zipper functions in `motrpac_backend_utils.zipper`, the `messaging` feature is automatically
 enabled, but the `zipper` feature must be enabled.
-
 
 ```bash
 pip install -e git+https://github.com/MoTrPAC/motrpac-backend-utils.git#egg=motrpac_backend_utils[zipper]
