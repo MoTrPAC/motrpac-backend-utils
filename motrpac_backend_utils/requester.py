@@ -1,4 +1,8 @@
 #  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+"""
+This module contains the Requester helper class. When using this, make sure that
+package features "messaging" or "zipper" are used
+"""
 
 from typing import NamedTuple, Type, TypeVar, Union
 

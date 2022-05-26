@@ -49,6 +49,8 @@ Google Cloud Logging and Google Cloud Tracing services. This can be a boolean va
 
 ## Zipper
 
+### Overview
+
 The zipper module contains the `ZipUploader` class which allows for asynchronous creation of a zip file from a list of
 files hosted in a single Google Cloud Storage bucket. It then uploads the completed zip file to another Google Cloud
 Storage Bucket.
@@ -69,3 +71,26 @@ process will continue.
 
 After completion of a zip file's creation a notification can be sent to a URL, using the notification protobuf defined
 in the `proto` directory.
+
+### Usage
+
+If using any of the messaging functions in `motrpac_backend_utils.messages` or the `Requester` class
+in `motrpac_backend_utils.requester`, ensure you `pip` install with the `messaging` feature enabled.
+
+```bash
+pip install -e git+https://github.com/MoTrPAC/motrpac-backend-utils.git#egg=motrpac_backend_utils[messaging]
+```
+
+*If using `zsh`, make sure to quote the url, like so:*
+
+```bash
+pip install -e  "git+https://github.com/MoTrPAC/motrpac-backend-utils.git#egg=motrpac_backend_utils[messaging]"
+```
+
+If using any of the zipper functions in `motrpac_backend_utils.zipper`, the `messaging` feature is automatically
+enabled, but the `zipper` feature must be enabled.
+
+
+```bash
+pip install -e git+https://github.com/MoTrPAC/motrpac-backend-utils.git#egg=motrpac_backend_utils[zipper]
+```

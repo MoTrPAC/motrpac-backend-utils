@@ -1,5 +1,8 @@
 #  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
-
+"""
+This module contains the messaging functions for the backend. When using this,
+make sure that package features "messaging" or "zipper" are used
+"""
 import logging
 from typing import List, Optional, Tuple
 
