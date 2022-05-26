@@ -7,10 +7,9 @@ from google.auth.transport.requests import AuthorizedSession
 from google.cloud.pubsub_v1 import PublisherClient
 from google.protobuf.message import Error
 
+from .proto import FileDownloadMessage, UserNotificationMessage
+from .requester import Requester
 from .utils import get_authorized_session
-from .proto.file_download_pb2 import FileDownloadMessage
-from .proto.notification_pb2 import UserNotificationMessage
-from .zipper import Requester
 
 logger = logging.getLogger(__name__)
 
