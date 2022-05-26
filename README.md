@@ -45,61 +45,25 @@ This contains functions for initializing Google Cloud Logging and Google Cloud T
 It reads an environment variable called `PRODUCTION_DEPLOYMENT` to determine whether to send logs and traces to the
 Google Cloud Logging and Google Cloud Tracing services. This can be a boolean value, or a string that can be 0 or 1.
 
-## Google Artifact Registry
+## Zipper
 
-It is hosted in a private Google Artifact Registry.
+The zipper module contains the `ZipUploader` class which allows for asynchronous creation of a zip file from a list of
+files hosted in a single Google Cloud Storage bucket. It then uploads the completed zip file to another Google Cloud
+Storage Bucket.
 
-### Getting Started
+The requested files are hashed in order to create a unique zip file name, and also to identify duplicate requests. Any
+duplicate requests are ignored, but their requesters are added to a list of requesters, who then get notified when the
+zip file is created.
 
-First install all dependencies
+It is able to process multiple requests for zip files concurrently using the `multiprocessing` module.
 
-```bash
-cd packages/motrpac-backend-utils
-poetry install
-```
+It caches common input files in the same location to reduce transfer costs. If multiple zip processes request the same
+file, the process which has already started downloading the file will continue, and the other processes will wait for
+completion.
 
-In order to authenticate with Google Artifact Registry, you should install `keyring`
-and `keyrings.google-artifactregistry-auth`:
+This class is designed to be used with or without Pub/Sub message that would have sent the zip request. If the message
+is provided, then the message's ack deadline will be extended to the maximum of the ack deadline of the message and the
+process will continue.
 
-```bash
-pip install keyring keyrings.google-artifactregistry-auth
-# Confirm that the backend was successfully installed
-keyring --list-backends
-# Confirm that the list includes:
-# ChainerBackend(priority:10)
-# GooglePythonAuth(priority: 9)
-```
-
-Then you can generate the settings that you need to add to certain local files in order to authenticate with the
-registry:
-
-```bash
-gcloud artifacts print-settings python --project=<project> \
-    --repository=<repository> \
-    --location=<region>
-```
-
-Your `pip.conf` should be located in the virtualenv created by Poetry
-
-You can run `poetry env info` to view the path of the virtual environment
-
-```bash
-Virtualenv
-Python:         3.9.10
-Implementation: CPython
-# this is the generated virtual environment
-Path:           /Users/user/Library/Caches/pypoetry/virtualenvs/motrpac-backend-utils-zxT_a_A5-py3.9
-Valid:          True
-
-System
-Platform: darwin
-OS:       posix
-Python:   /Users/user/.pyenv/versions/3.9.10
-```
-
-### Building the package
-
-```bash
-poetry build
-twine upload --repository-url https://<region>-python.pkg.dev/<project>/<repo>/ dist/*
-```
+After completion of a zip file's creation a notification can be sent to a URL, using the notification protobuf defined
+in the `proto` directory.
