@@ -33,12 +33,12 @@ brew install protobuf
 ```
 
 *Note: as of 5/26/22 `protoc` has not been updated to the latest version on Homebrew, so you will need to manually
-install it using the instructions below*
+install it (up to v3.20.1 as v21.0 is incompatible with Python APIs) using the instructions below*
 
 ##### Manual Install
 
 ```bash
-PROTOC_VERSION=21.0
+PROTOC_VERSION=3.20.1
 PROTOC_ZIP=protoc-$PROTOC_VERSION-{REPLACE BRACKETS WITH YOUR PLATFORM (i.e. win64, osx, or linux}-$(uname -m).zip
 curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_ZIP
 sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
