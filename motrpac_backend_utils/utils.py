@@ -1,11 +1,11 @@
 #  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 
 import os
-from concurrent.futures import ThreadPoolExecutor, Future
+import sys
+from concurrent.futures import Future, ThreadPoolExecutor
 from functools import wraps
 from hashlib import md5
-from typing import List, TypeVar, Callable
-import sys
+from typing import Callable, List, TypeVar
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec

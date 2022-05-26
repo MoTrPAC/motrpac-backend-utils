@@ -3,7 +3,7 @@
 import time
 from collections import defaultdict
 from multiprocessing import Array, Value
-from typing import DefaultDict, List, Set
+from typing import DefaultDict, List, Set, Type
 
 from ..requester import Requester
 
@@ -13,7 +13,7 @@ class LastMessage:
     A utility class for tracking the last message sent
     """
 
-    def __init__(self, atomic_last_message_time: Value):
+    def __init__(self, atomic_last_message_time: Type[Value]):
         self.time = atomic_last_message_time
         self.time.value = int(time.time())
         self.diff = 0
@@ -37,7 +37,7 @@ class InProgressCache:
     A utility class for tracking which files are being processed
     """
 
-    def __init__(self, atomic_in_progress: Value, atomic_processing_hashes: Array):
+    def __init__(self, atomic_in_progress: Type[Value], atomic_processing_hashes: Type[Array]):
         """
         Creates a new instance of the InProgressCache
         """
