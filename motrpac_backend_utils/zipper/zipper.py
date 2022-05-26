@@ -27,7 +27,7 @@ from ..utils import threadpool
 from .cache import InProgressCache
 from .utils import get_path_dict
 
-MAX_IN_PROGRESS = os.cpu_count() - 3 or 1
+MAX_IN_PROGRESS = max(os.cpu_count() - 3 or 1, 1)
 
 # setup local logging/Google Cloud Logging
 logger = logging.getLogger()
