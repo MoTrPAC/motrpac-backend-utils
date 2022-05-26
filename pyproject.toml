@@ -32,6 +32,8 @@ black = "^22.3.0"
 pylint = "^2.13.7"
 bandit = "^1.7.4"
 flake8 = "^4.0.1"
+mypy = "^0.960"
+types-protobuf = "^3.19.21"
 
 [tool.poetry.extras]
 zipper = ["google-cloud-storage", "psutil", "smart-open", "google-cloud-pubsub", "protobuf"]
