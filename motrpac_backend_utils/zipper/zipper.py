@@ -1,3 +1,5 @@
+#  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+
 import json
 import logging
 import os

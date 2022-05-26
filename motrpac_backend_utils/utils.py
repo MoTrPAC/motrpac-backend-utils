@@ -1,3 +1,5 @@
+#  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+
 import os
 from hashlib import md5
 from typing import List

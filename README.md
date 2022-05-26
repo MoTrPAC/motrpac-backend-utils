@@ -1,5 +1,7 @@
 # MoTrPAC Backend Utils
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 This package provides code used across multiple services in the MoTrPAC backend.
 
 This package is created using the Poetry package manager.

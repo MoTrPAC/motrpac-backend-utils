@@ -4,6 +4,7 @@ version = "0.1.4"
 description = ""
 authors = ["Mihir Samdarshi <msamdars@stanford.edu>"]
 packages = [{include = "motrpac_backend_utils"}]
+license = "Apache-2.0"
 
 [tool.poetry.dependencies]
 python = "^3.9"

@@ -1,3 +1,5 @@
+#  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+
 import logging
 from typing import List, Optional, Tuple
 

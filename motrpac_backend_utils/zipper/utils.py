@@ -1,3 +1,5 @@
+#  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+
 import time
 from collections import defaultdict
 from multiprocessing import Array, Value
