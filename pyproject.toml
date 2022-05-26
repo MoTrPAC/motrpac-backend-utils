@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "motrpac-backend-utils"
-version = "0.1.4"
+version = "0.1.5"
 description = ""
 authors = ["Mihir Samdarshi <msamdars@stanford.edu>"]
 packages = [{include = "motrpac_backend_utils"}]
@@ -9,7 +9,7 @@ license = "Apache-2.0"
 [tool.poetry.dependencies]
 python = "^3.9"
 google-auth = "^2.6.6"
-google-cloud-logging = "^3.0.0"
+google-cloud-logging = "^3.1.1"
 google-cloud-pubsub = "^2.12.0"
 google-cloud-storage = "^2.3.0"
 opentelemetry-api = "^1.11.1"
@@ -18,7 +18,7 @@ opentelemetry-instrumentation-requests = "^0.30b1"
 opentelemetry-instrumentation-urllib3 = "^0.30b1"
 opentelemetry-propagator-gcp = "^1.3.0"
 opentelemetry-sdk = "^1.11.1"
-protobuf = "^3.20.1"
+protobuf = "^4.21.0"
 psutil = "^5.9.0"
 requests = "^2.24.0"
 smart-open = "^6.0.0"
