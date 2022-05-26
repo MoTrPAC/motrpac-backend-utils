@@ -11,7 +11,7 @@ help:
 
 .PHONY: init
 # Initialize all dependencies
-init: check-requirements protobuf-init prototyping-init infra-init
+init: get-poetry venv-init check-requirements
 
 .PHONY: check-requirements
 # Check if all dependencies are installed
@@ -39,4 +39,4 @@ venv-init:
 .PHONY: protobuf-init
 # generate protobuf files from the proto files
 protobuf-init:
-	protoc --proto_path=$(CWD)/$(PROTO_PATH) --plugin=protoc-gen-mypy=$(VENV_PATH)/bin/protoc-gen-mypy --python_out=$(CWD)/$(PROTO_DIR) --mypy_out=$(CWD)/$(PROTO_DIR) file_download.proto notification.proto
+	protoc --proto_path=$(CWD)/$(PROTO_PATH) --python_out=$(CWD)/$(PROTO_DIR) --pyi_out=$(CWD)/$(PROTO_DIR) file_download.proto notification.proto
