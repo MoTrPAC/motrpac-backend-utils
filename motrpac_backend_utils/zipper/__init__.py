@@ -1,2 +1,2 @@
-from utils import *
-from zipper import *
+from .utils import *
+from .zipper import *
