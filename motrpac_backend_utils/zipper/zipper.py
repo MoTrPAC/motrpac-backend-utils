@@ -5,26 +5,27 @@ import logging
 import os
 import shutil
 import time
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, as_completed
 from copy import deepcopy
 from datetime import datetime, timezone
-from functools import wraps
+from math import ceil
 from multiprocessing import JoinableQueue, Process, Value
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
-from typing import Callable, List, Optional, ParamSpec, TypedDict, TypeVar, Union
+from typing import List, Optional, TypedDict, Union
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from google.cloud.pubsub_v1.subscriber.message import Message
 from google.cloud.storage import Client as StorageClient
-from math import ceil
 from opentelemetry import trace
 from psutil import virtual_memory
 from smart_open import open
 
 from ..messages import send_notification_message
-from .utils import InProgressCache, Requester, get_path_dict
-
+from ..requester import Requester
+from ..utils import threadpool
+from .cache import InProgressCache
+from .utils import get_path_dict
 
 MAX_IN_PROGRESS = os.cpu_count() - 3 or 1
 
@@ -43,26 +44,6 @@ class ZipProcessResult(TypedDict):
     manifest: List[str]
     fileHash: str
     requesters: Optional[List[str]]
-
-
-P = ParamSpec("P")
-R = TypeVar("R")
-
-_DEFAULT_POOL = ThreadPoolExecutor()
-
-
-def threadpool(f: Callable[P, R]) -> Callable[P, Future[R]]:
-    """
-    Decorator that wraps a function and runs it in a threadpool.
-    :param f: The function to wrap
-    :return: The wrapped function
-    """
-
-    @wraps(f)
-    def wrap(*args, **kwargs) -> Future[R]:
-        return _DEFAULT_POOL.submit(f, *args, **kwargs)
-
-    return wrap
 
 
 def add_to_zip(
@@ -95,7 +76,7 @@ def add_to_zip(
             os.getpid(),
         )
         # Process-local instance of the Storage client.
-        upload_buffer_size = 2 ** 8 * 256 * 1024
+        upload_buffer_size = 2**8 * 256 * 1024
 
         # Figure out how much memory we have available to allocate the new zip file
         memory = virtual_memory()
@@ -103,7 +84,7 @@ def add_to_zip(
         logger.debug(
             "[File Hash: %s] Allocating %s GB of memory for temp zip file",
             file_hash,
-            round(free_memory / (1024 ** 3), 4),
+            round(free_memory / (1024**3), 4),
         )
         manifest: List[str] = []
         storage_client = StorageClient()
