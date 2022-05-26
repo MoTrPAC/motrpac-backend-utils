@@ -28,10 +28,10 @@ def decode_file_download_message(message: bytes) -> Tuple[List[str], Requester]:
     try:
         message_data = FileDownloadMessage()
         message_data.ParseFromString(message)
-        requested_files = message_data.files
+        requested_files = list(message_data.files)
         requester = Requester.from_proto(message_data.requester)
-    except Error:
-        raise ValueError("Failed to decode protobuf message")
+    except Error as e:
+        raise ValueError("Failed to decode protobuf message") from e
 
     return requested_files, requester
 

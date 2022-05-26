@@ -2,13 +2,13 @@
 
 import json
 import logging
+import math
 import os
 import shutil
 import time
 from concurrent.futures import Future, as_completed
 from copy import deepcopy
 from datetime import datetime, timezone
-from math import ceil
 from multiprocessing import JoinableQueue, Process, Value
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
@@ -100,7 +100,7 @@ def add_to_zip(
                         "[File Hash: %s] Received message from queue %s", file_hash, f
                     )
                     # sentinel to tell the multiprocessing to stop processing
-                    if type(f) == bool and not f:
+                    if isinstance(f, bool) and not f:
                         queue.task_done()
                         break
                     # create a file in the archive
@@ -156,7 +156,7 @@ def estimate_remaining_time(
         total_file_count - current_file_count
     )
 
-    return min(ceil(remaining_time * 1.5), 600)
+    return min(math.ceil(remaining_time * 1.5), 600)
 
 
 class ZipUploader:
