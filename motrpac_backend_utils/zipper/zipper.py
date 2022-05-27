@@ -436,7 +436,7 @@ class ZipUploader:
             "outputPath": self.full_output_path,
             "manifest": self.files,
             "fileHash": self.file_hash,
-            "requesters": [r.to_str() for r in self.requesters],
+            "requesters": [str(r) for r in self.requesters],
         }
 
     def send_notification(self):
@@ -484,6 +484,12 @@ class ZipUploader:
                 t2 = time.perf_counter()
                 logger.info("%s REQUEST TIMER: %s seconds", self.log_prefix, t2 - t1)
             except Exception as e:
+                logger.exception(
+                    "Exception occurred while processing files: %s",
+                    str(e),
+                    exc_info=True,
+                    stack_info=True,
+                )
                 if self.tmp_dir_path:
                     shutil.rmtree(self.tmp_dir_path)
                 raise Exception from e

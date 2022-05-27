@@ -4,12 +4,15 @@ This module contains the Requester helper class. When using this, make sure that
 package features "messaging" or "zipper" are used
 """
 
-from typing import NamedTuple, Type, TypeVar, Union
+from typing import NamedTuple, TypeVar, Union, Type
+
+from google.protobuf.message import Message
 
 from .proto import FileDownloadMessage, UserNotificationMessage
 
-T = TypeVar("T", bound="Requester")
-U = TypeVar("U")
+
+T = TypeVar('T', bound='Requester')
+U = TypeVar('U', Type[UserNotificationMessage.Requester], Type[FileDownloadMessage.Requester])
 
 
 class Requester(NamedTuple):
@@ -20,7 +23,7 @@ class Requester(NamedTuple):
     name: str
     email: str
 
-    def to_proto(self, parent_cls: U) -> U:
+    def to_proto(self, parent_cls: U) -> Message:
         """
         Converts this Requester object to a protobuf object.
         """
