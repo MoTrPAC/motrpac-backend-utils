@@ -5,7 +5,8 @@ import sys
 from concurrent.futures import Future, ThreadPoolExecutor
 from functools import wraps
 from hashlib import md5
-from typing import Callable, List, TypeVar
+from typing import Callable, List, TypeVar, Optional
+
 
 if sys.version_info >= (3, 10):
     from typing import ParamSpec
@@ -76,15 +77,16 @@ R = TypeVar("R")
 _DEFAULT_POOL = ThreadPoolExecutor()
 
 
-def threadpool(f: Callable[P, R]) -> Callable[P, Future[R]]:
+def threadpool(pool: Optional[ThreadPoolExecutor]):
     """
     Decorator that wraps a function and runs it in a threadpool.
     :param f: The function to wrap
+    :param pool: A threadpool to use, or the default threadpool if None
     :return: The wrapped function
     """
-
-    @wraps(f)
-    def wrap(*args, **kwargs) -> Future[R]:
-        return _DEFAULT_POOL.submit(f, *args, **kwargs)
-
-    return wrap
+    def decorator(f: Callable[P, R]) -> Callable[P, Future[R]]:
+        @wraps(f)
+        def wrap(*args, **kwargs) -> Future[R]:
+            return (pool or _DEFAULT_POOL).submit(f, *args, **kwargs)
+        return wrap
+    return decorator
