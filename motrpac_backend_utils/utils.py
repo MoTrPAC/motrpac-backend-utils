@@ -1,17 +1,9 @@
 #  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 
 import os
-import sys
-from concurrent.futures import Future, ThreadPoolExecutor
-from functools import wraps
 from hashlib import md5
-from typing import Callable, List, TypeVar, Optional
+from typing import List
 
-
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec
-else:
-    from typing_extensions import ParamSpec
 
 import google.auth
 from google.auth.compute_engine import IDTokenCredentials
@@ -72,21 +64,3 @@ def generate_file_hash(files: List[str]):
     return sorted_files, md5_hash
 
 
-P = ParamSpec("P")
-R = TypeVar("R")
-_DEFAULT_POOL = ThreadPoolExecutor()
-
-
-def threadpool(pool: Optional[ThreadPoolExecutor]):
-    """
-    Decorator that wraps a function and runs it in a threadpool.
-    :param f: The function to wrap
-    :param pool: A threadpool to use, or the default threadpool if None
-    :return: The wrapped function
-    """
-    def decorator(f: Callable[P, R]) -> Callable[P, Future[R]]:
-        @wraps(f)
-        def wrap(*args, **kwargs) -> Future[R]:
-            return (pool or _DEFAULT_POOL).submit(f, *args, **kwargs)
-        return wrap
-    return decorator

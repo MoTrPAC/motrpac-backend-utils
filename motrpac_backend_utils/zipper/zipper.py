@@ -23,7 +23,7 @@ from smart_open import open
 
 from ..messages import send_notification_message
 from ..requester import Requester
-from ..utils import threadpool
+from ..threadpool import threadpool
 from .cache import InProgressCache
 from .utils import get_path_dict
 
