@@ -133,3 +133,12 @@ enabled, but the `zipper` feature must be enabled.
 ```bash
 pip install -e git+https://github.com/MoTrPAC/motrpac-backend-utils.git#egg=motrpac_backend_utils[zipper]
 ```
+
+
+### Generating a changelog
+
+Use [`git-cliff`](https://github.com/orhun/git-cliff)
+
+```bash
+git cliff --output CHANGELOG.md --strip footer
+```
