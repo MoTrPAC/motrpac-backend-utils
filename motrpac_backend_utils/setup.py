@@ -25,10 +25,7 @@ def setup_logging_and_tracing(log_level=logging.INFO):
 
     :param log_level: The log level to use. Defaults to logging.INFO
     """
-    log_format = "{levelname} {asctime} {name}:{funcName}:{lineno} {message}"
-    logging.basicConfig(
-        style="{", format=log_format, datefmt="%I:%M:%S %p", level=log_level
-    )
+
     if IS_PROD:
         client = LoggingClient()
         client.setup_logging(log_level=log_level)
@@ -36,7 +33,10 @@ def setup_logging_and_tracing(log_level=logging.INFO):
         logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
         logging.getLogger("urllib3.util.retry").setLevel(logging.WARNING)
     else:
-        logging.basicConfig(level=log_level)
+        log_format = "{levelname} {asctime} {name}:{funcName}:{lineno} {message}"
+        logging.basicConfig(
+            style="{", format=log_format, datefmt="%I:%M:%S %p", level=log_level
+        )
 
     # setup tracing/Google Cloud Tracing if we are in production
     tracer_provider = TracerProvider()
@@ -45,7 +45,5 @@ def setup_logging_and_tracing(log_level=logging.INFO):
     URLLib3Instrumentor().instrument()
     if IS_PROD:
         trace_exporter = CloudTraceSpanExporter()
-        trace.get_tracer_provider().add_span_processor(
-            BatchSpanProcessor(trace_exporter)
-        )
+        trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(trace_exporter))
         set_global_textmap(CloudTraceFormatPropagator())
