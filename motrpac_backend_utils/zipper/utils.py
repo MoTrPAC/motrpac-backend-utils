@@ -28,7 +28,7 @@ def get_path_dict(paths: List[str]) -> dict:
     """
     new_path_dict = nested_dict()
     for path in paths:
-        parts = path.split('/')
+        parts = path.split("/")
         if parts:
             marcher = new_path_dict
             for key in parts[:-1]:

@@ -11,8 +11,10 @@ from google.protobuf.message import Message
 from .proto import FileDownloadMessage, UserNotificationMessage
 
 
-T = TypeVar('T', bound='Requester')
-U = TypeVar('U', Type[UserNotificationMessage.Requester], Type[FileDownloadMessage.Requester])
+T = TypeVar("T", bound="Requester")
+U = TypeVar(
+    "U", Type[UserNotificationMessage.Requester], Type[FileDownloadMessage.Requester]
+)
 
 
 class Requester(NamedTuple):

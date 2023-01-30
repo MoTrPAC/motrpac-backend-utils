@@ -62,5 +62,3 @@ def generate_file_hash(files: List[str]):
     md5_hash = md5(",".join(sorted_files).encode("utf-8")).hexdigest()
 
     return sorted_files, md5_hash
-
-

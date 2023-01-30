@@ -37,7 +37,9 @@ class InProgressCache:
     A utility class for tracking which files are being processed
     """
 
-    def __init__(self, atomic_in_progress: Type[Value], atomic_processing_hashes: Type[Array]):
+    def __init__(
+        self, atomic_in_progress: Type[Value], atomic_processing_hashes: Type[Array]
+    ):
         """
         Creates a new instance of the InProgressCache
         """

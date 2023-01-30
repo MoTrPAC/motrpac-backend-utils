@@ -45,5 +45,7 @@ def setup_logging_and_tracing(log_level=logging.INFO):
     URLLib3Instrumentor().instrument()
     if IS_PROD:
         trace_exporter = CloudTraceSpanExporter()
-        trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(trace_exporter))
+        trace.get_tracer_provider().add_span_processor(
+            BatchSpanProcessor(trace_exporter)
+        )
         set_global_textmap(CloudTraceFormatPropagator())
