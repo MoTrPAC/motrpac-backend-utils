@@ -1,10 +1,9 @@
 #  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 """
-This module contains the messaging functions for the backend. When using this,
-make sure that package features "messaging" or "zipper" are used
+Contains the messaging functions for the backend. When using this,
+make sure that package features "messaging" or "zipper" are used.
 """
 import logging
-from typing import List, Optional, Tuple, Type
 
 from google.auth.transport.requests import AuthorizedSession
 from google.cloud.pubsub_v1 import PublisherClient
@@ -18,10 +17,10 @@ from .utils import get_authorized_session
 logger = logging.getLogger(__name__)
 
 
-def decode_file_download_message(message: bytes) -> Tuple[List[str], Requester]:
+def decode_file_download_message(message: bytes) -> tuple[list[str], Requester]:
     """
     Parses a File Download Protobuf message into a List of requested files and a named
-    tuple of type Requester
+    tuple of type Requester.
 
     :param message: The Protobuf message (encoded as bytes)
     :return: The decoded message
@@ -32,7 +31,8 @@ def decode_file_download_message(message: bytes) -> Tuple[List[str], Requester]:
         requested_files = list(message_data.files)
         requester = Requester.from_proto(message_data.requester)
     except Error as e:
-        raise ValueError("Failed to decode protobuf message") from e
+        msg = "Failed to decode protobuf message"
+        raise ValueError(msg) from e
 
     return requested_files, requester
 
@@ -41,10 +41,10 @@ def decode_file_download_message(message: bytes) -> Tuple[List[str], Requester]:
 def publish_file_download_message(
     name: str,
     email: str,
-    files: List[str],
+    files: list[str],
     topic_id: str,
-    client: Type[PublisherClient],
-):
+    client: PublisherClient,
+) -> None:
     """
     Publishes a FileDownloadMessage protobuf message to the topic id provided.
 
@@ -60,7 +60,7 @@ def publish_file_download_message(
         message = FileDownloadMessage()
         message.files.extend(files)
         message.requester.CopyFrom(
-            Requester(name=name, email=email).to_proto(FileDownloadMessage.Requester)
+            Requester(name=name, email=email).to_proto(FileDownloadMessage.Requester),
         )
         # Encode the data according to the message serialization type.
         msg_data = message.SerializeToString()
@@ -71,9 +71,7 @@ def publish_file_download_message(
     # pylint: disable=broad-except
     except Exception as e:
         logger.exception(
-            "Exception occurred while publishing message: %s",
-            str(e),
-            exc_info=True,
+            "Exception occurred while publishing message.",
             stack_info=True,
         )
         raise e from e
@@ -83,10 +81,10 @@ def send_notification_message(
     name: str,
     email: str,
     output_filename: str,
-    manifest: List[str],
+    manifest: list[str],
     url: str,
-    session: Optional[AuthorizedSession] = None,
-):
+    session: AuthorizedSession | None = None,
+) -> None:
     """
     Publishes a message to the topic.
 
@@ -102,8 +100,8 @@ def send_notification_message(
         message = UserNotificationMessage()
         message.requester.CopyFrom(
             Requester(name=name, email=email).to_proto(
-                UserNotificationMessage.Requester
-            )
+                UserNotificationMessage.Requester,
+            ),
         )
         message.zipfile = output_filename
         message.files.extend(manifest)
@@ -113,15 +111,13 @@ def send_notification_message(
         if session is None:
             session = get_authorized_session(url)
         session.post(
-            url=url, data=msg_data, headers={"Content-Type": "application/octet-stream"}
+            url=url, data=msg_data, headers={"Content-Type": "application/octet-stream"},
         )
 
     # pylint: disable=broad-except
     except Exception as e:
         logger.exception(
-            "Exception occurred while sending message: %s",
-            str(e),
-            exc_info=True,
+            "Exception occurred while sending message.",
             stack_info=True,
         )
         raise e from e

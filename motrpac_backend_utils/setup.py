@@ -1,5 +1,7 @@
 #  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
-
+"""
+A utility module for setting up logging and tracing.
+"""
 import logging
 import os
 
@@ -13,10 +15,11 @@ from opentelemetry.propagators.cloud_trace_propagator import CloudTraceFormatPro
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+
 IS_PROD = bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0")))
 
 
-def setup_logging_and_tracing(log_level=logging.INFO):
+def setup_logging_and_tracing(log_level: int = logging.INFO) -> None:
     """
     Setup local logging/Google Cloud Logging and tracing. It reads an environment
     variable called `PRODUCTION_DEPLOYMENT` to determine whether to send logs and
@@ -25,7 +28,6 @@ def setup_logging_and_tracing(log_level=logging.INFO):
 
     :param log_level: The log level to use. Defaults to logging.INFO
     """
-
     if IS_PROD:
         client = LoggingClient()
         client.setup_logging(log_level=log_level)
@@ -35,7 +37,7 @@ def setup_logging_and_tracing(log_level=logging.INFO):
     else:
         log_format = "{levelname} {asctime} {name}:{funcName}:{lineno} {message}"
         logging.basicConfig(
-            style="{", format=log_format, datefmt="%I:%M:%S %p", level=log_level
+            style="{", format=log_format, datefmt="%I:%M:%S %p", level=log_level,
         )
 
     # setup tracing/Google Cloud Tracing if we are in production
@@ -46,6 +48,6 @@ def setup_logging_and_tracing(log_level=logging.INFO):
     if IS_PROD:
         trace_exporter = CloudTraceSpanExporter()
         trace.get_tracer_provider().add_span_processor(
-            BatchSpanProcessor(trace_exporter)
+            BatchSpanProcessor(trace_exporter),
         )
         set_global_textmap(CloudTraceFormatPropagator())
