@@ -6,7 +6,7 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class UserNotificationMessage(_message.Message):
-    __slots__ = ["files", "requester", "zipfile"]
+    __slots__ = ["requester", "zipfile", "files"]
     class Requester(_message.Message):
         __slots__ = ["email", "name"]
         EMAIL_FIELD_NUMBER: _ClassVar[int]
@@ -14,10 +14,10 @@ class UserNotificationMessage(_message.Message):
         email: str
         name: str
         def __init__(self, email: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
-    FILES_FIELD_NUMBER: _ClassVar[int]
     REQUESTER_FIELD_NUMBER: _ClassVar[int]
     ZIPFILE_FIELD_NUMBER: _ClassVar[int]
-    files: _containers.RepeatedScalarFieldContainer[str]
+    FILES_FIELD_NUMBER: _ClassVar[int]
     requester: UserNotificationMessage.Requester
     zipfile: str
+    files: _containers.RepeatedScalarFieldContainer[str]
     def __init__(self, requester: _Optional[_Union[UserNotificationMessage.Requester, _Mapping]] = ..., zipfile: _Optional[str] = ..., files: _Optional[_Iterable[str]] = ...) -> None: ...
