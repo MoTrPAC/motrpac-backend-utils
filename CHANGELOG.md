@@ -2,6 +2,56 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.14] - 2023-06-01
+
+### Features
+
+- Update typing stubs of protobuf messages
+
+### Miscellaneous Tasks
+
+- Bump requirements
+- Change priority of Python versions
+- Fix license
+- Bump version to 0.1.14
+
+### Styling
+
+- Run ruff on package
+
+## [0.1.13] - 2023-01-30
+
+### Features
+
+- Add Flask Cloud Trace filter to package
+
+### Miscellaneous Tasks
+
+- Add Flask to project optional dependencies
+- Bump version to 0.1.13
+
+### Styling
+
+- Apply Black to project
+
+## [0.1.12] - 2022-11-03
+
+### Bug Fixes
+
+- Don't write logs to StreamHandlers when in production mode
+
+### Miscellaneous Tasks
+
+- Bump version to 0.1.12
+
+## [0.1.11] - 2022-08-31
+
+### Miscellaneous Tasks
+
+- Add changelog, .python-version for pyenv, and update README.md
+- Bump dependencies, fix conflicts caused by opentelemetry's non-semantic versioning
+- Bump version to 0.1.11
+
 ## [0.1.10] - 2022-08-11
 
 ### Miscellaneous Tasks
