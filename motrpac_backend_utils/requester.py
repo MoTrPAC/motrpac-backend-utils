@@ -57,7 +57,7 @@ class Requester(NamedTuple):
         """
         return hash((self.name, self.email))
 
-    def __eq__(self, other: Any) -> bool | NotImplemented:
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, type(self)):
-            return NotImplemented
+            raise NotImplementedError
         return self.name == other.name and self.email == other.email
