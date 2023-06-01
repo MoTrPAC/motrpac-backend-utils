@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.16] - 2023-06-01
+
+### Bug Fixes
+
+- Type-checking bug fix
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md
+- Bump version to 0.1.16
+
 ## [0.1.15] - 2023-06-01
 
 ### Miscellaneous Tasks
