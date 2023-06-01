@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.15] - 2023-06-01
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md
+- Update protoc generated python files
+- Bump protobuf library requirement
+- Bump version to 0.1.15
+
 ## [0.1.14] - 2023-06-01
 
 ### Features
