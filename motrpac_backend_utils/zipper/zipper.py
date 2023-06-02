@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from multiprocessing import JoinableQueue, Process, Value
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
-from typing import TypedDict
+from typing import TypedDict, Optional
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from google.cloud.pubsub_v1.subscriber.message import Message
@@ -56,7 +56,7 @@ def add_to_zip(
     output_bucket: str,
     file_path_prefix: os.PathLike,
     queue: "JoinableQueue[str | bool]",
-    processed_counter: Value | None,
+    processed_counter: Optional[Value],
 ) -> bool:
     """
     Adds files to an archive, working asynchronously, with another process which will
