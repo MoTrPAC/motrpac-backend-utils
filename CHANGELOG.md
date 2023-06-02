@@ -2,27 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.16] - 2023-06-01
+## [0.1.17] - 2023-06-02
+
+### Bug Fixes
+
+- Invalid type annotation
+
+### Miscellaneous Tasks
+
+- Add cliff.toml for changelog generation
+
+## [0.1.16] - 2023-06-02
 
 ### Bug Fixes
 
 - Type-checking bug fix
 
-### Miscellaneous Tasks
-
-- Update CHANGELOG.md
-- Bump version to 0.1.16
-
-## [0.1.15] - 2023-06-01
+## [0.1.15] - 2023-06-02
 
 ### Miscellaneous Tasks
 
-- Update CHANGELOG.md
+- *(deps)* Bump protobuf library requirement
 - Update protoc generated python files
-- Bump protobuf library requirement
-- Bump version to 0.1.15
 
-## [0.1.14] - 2023-06-01
+## [0.1.14] - 2023-06-02
 
 ### Features
 
@@ -30,16 +33,15 @@ All notable changes to this project will be documented in this file.
 
 ### Miscellaneous Tasks
 
-- Bump requirements
+- *(deps)* Bump requirements
 - Change priority of Python versions
 - Fix license
-- Bump version to 0.1.14
 
 ### Styling
 
 - Run ruff on package
 
-## [0.1.13] - 2023-01-30
+## [0.1.13] - 2023-06-02
 
 ### Features
 
@@ -47,45 +49,41 @@ All notable changes to this project will be documented in this file.
 
 ### Miscellaneous Tasks
 
-- Add Flask to project optional dependencies
-- Bump version to 0.1.13
+- *(deps)* Add Flask to project optional dependencies
 
 ### Styling
 
 - Apply Black to project
 
-## [0.1.12] - 2022-11-03
+## [0.1.12] - 2023-06-02
 
 ### Bug Fixes
 
 - Don't write logs to StreamHandlers when in production mode
 
-### Miscellaneous Tasks
+## [0.1.11] - 2023-06-02
 
-- Bump version to 0.1.12
+### Bug Fixes
 
-## [0.1.11] - 2022-08-31
+- Bump dependencies, fix conflicts caused by opentelemetry's non-semantic versioning
 
 ### Miscellaneous Tasks
 
 - Add changelog, .python-version for pyenv, and update README.md
-- Bump dependencies, fix conflicts caused by opentelemetry's non-semantic versioning
-- Bump version to 0.1.11
 
-## [0.1.10] - 2022-08-11
+## [0.1.10] - 2023-06-02
 
 ### Miscellaneous Tasks
 
-- Update type annotations
+- *(deps)* Bump deps
 - Delete dist/ directory
-- Bump deps
-- Bump version to 0.1.10
 
 ### Refactor
 
+- Update type annotations
 - Move threadpool code into threadpool.py so that a threadpool doesn't get created when importing utils
 
-## [0.1.9] - 2022-05-27
+## [0.1.9] - 2023-06-02
 
 ### Bug Fixes
 
@@ -98,11 +96,10 @@ All notable changes to this project will be documented in this file.
 
 ### Miscellaneous Tasks
 
+- *(deps)* Bump dependencies
 - Add .mypy_cache/ to .gitignore
-- Bump dependencies
-- Bump version to 0.1.9
 
-## [0.1.8] - 2022-05-26
+## [0.1.8] - 2023-06-02
 
 ### Bug Fixes
 
@@ -115,11 +112,14 @@ All notable changes to this project will be documented in this file.
 
 ### Miscellaneous Tasks
 
+- *(deps)* Add additional development dependencies
 - Fix Makefile, remove mypy protoc plugin
-- Add additional development dependencies
-- Bump version to 0.1.8
 
-## [0.1.7] - 2022-05-26
+## [0.1.7] - 2023-06-02
+
+### Bug Fixes
+
+- Use typing extensions if python version < 3.10
 
 ### Documentation
 
@@ -127,29 +127,22 @@ All notable changes to this project will be documented in this file.
 
 ### Miscellaneous Tasks
 
-- Use typing extensions if python version < 3.10
 - Make some zipper dependencies optional/enabled via extras
-- Bump version to 0.1.7
 
-## [0.1.6] - 2022-05-26
+## [0.1.6] - 2023-06-02
 
 ### Bug Fixes
 
 - Fix circular imports
 
-### Miscellaneous Tasks
-
-- Bump version to 0.1.6
-
-## [0.1.5] - 2022-05-26
+## [0.1.5] - 2023-06-02
 
 ### Miscellaneous Tasks
 
 - Update documentation to better describe the zipper module
 - Add license/copyright info
-- Bump version to 0.1.5
 
-## [0.1.4] - 2022-05-26
+## [0.1.4] - 2023-06-02
 
 ### Bug Fixes
 
@@ -159,17 +152,13 @@ All notable changes to this project will be documented in this file.
 
 - Update documentation formatting
 
-### Miscellaneous Tasks
-
-- Bump project version
-
-## [0.1.3] - 2022-05-21
+## [0.1.3] - 2023-06-02
 
 ### Features
 
 - Add decode message
 
-## [0.1.2] - 2022-05-21
+## [0.1.2] - 2023-06-02
 
 ### Bug Fixes
 
@@ -179,17 +168,13 @@ All notable changes to this project will be documented in this file.
 
 - Add Makefile
 
-## [0.1.1] - 2022-05-20
+## [0.1.1] - 2023-06-02
 
 ### Documentation
 
 - Add README.md
 
-### Miscellaneous Tasks
-
-- Bump version
-
-## [0.1.0] - 2022-05-20
+## [0.1.0] - 2023-06-02
 
 ### Bug Fixes
 
@@ -200,11 +185,10 @@ All notable changes to this project will be documented in this file.
 
 - Create Python packages
 - Add README.md
-- Finish up package
 
 ### Miscellaneous Tasks
 
-- Add development dependencies
+- *(deps)* Add development dependencies
 
 ### Refactor
 
