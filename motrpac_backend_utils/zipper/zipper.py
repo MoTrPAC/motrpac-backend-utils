@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from multiprocessing import JoinableQueue, Process, Value
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
-from typing import TypedDict, Optional
+from typing import TypedDict
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from google.cloud.pubsub_v1.subscriber.message import Message
@@ -510,10 +510,7 @@ class ZipUploader:
                 t2 = time.perf_counter()
                 logger.info("%s REQUEST TIMER: %s seconds", self.log_prefix, t2 - t1)
             except Exception as e:
-                logger.exception(
-                    "Exception occurred while processing files.",
-                    stack_info=True,
-                )
+                logger.exception("Exception occurred while processing files.")
                 if self.tmp_dir_path:
                     shutil.rmtree(self.tmp_dir_path)
                 raise ZipUploadError from e

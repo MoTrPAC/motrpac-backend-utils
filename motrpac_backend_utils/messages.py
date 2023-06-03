@@ -70,10 +70,7 @@ def publish_file_download_message(
         logger.info("Published message ID: %s", future.result())
     # pylint: disable=broad-except
     except Exception as e:
-        logger.exception(
-            "Exception occurred while publishing message.",
-            stack_info=True,
-        )
+        logger.exception("Exception occurred while publishing message.")
         raise e from e
 
 
@@ -116,8 +113,5 @@ def send_notification_message(
 
     # pylint: disable=broad-except
     except Exception as e:
-        logger.exception(
-            "Exception occurred while sending message.",
-            stack_info=True,
-        )
+        logger.exception("Exception occurred while sending message.")
         raise e from e
