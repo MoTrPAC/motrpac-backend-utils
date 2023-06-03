@@ -63,7 +63,8 @@ def generate_file_hash(files: list[str]) -> tuple[list[str], str]:
     # Creates an MD5 hash of the files to be uploaded, joining the list with a comma
     # separating the files
     md5_hash = md5(
-        ",".join(sorted_files).encode("utf-8"), usedforsecurity=False,
+        ",".join(sorted_files).encode("utf-8"),
+        usedforsecurity=False,
     ).hexdigest()
 
     return sorted_files, md5_hash
