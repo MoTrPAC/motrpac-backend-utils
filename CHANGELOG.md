@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.19] - 2023-06-03
+
+### Bug Fixes
+
+- Fix erroneous code detected by tests
+
+### Testing
+
+- Add tests for messages and threadpool
+
 ## [0.1.18] - 2023-06-03
 
 ### Bug Fixes
