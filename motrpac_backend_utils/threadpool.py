@@ -19,11 +19,10 @@ _DEFAULT_POOL = ThreadPoolExecutor()
 
 
 def threadpool(
-    pool: ThreadPoolExecutor | None,
+    pool: ThreadPoolExecutor | None = None,
 ) -> Callable[[Callable[P, R]], Callable[P, Future[R]]]:
     """
     Decorator that wraps a function and runs it in a threadpool.
-    :param f: The function to wrap
     :param pool: A threadpool to use, or the default threadpool if None
     :return: The wrapped function.
     """
