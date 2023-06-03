@@ -56,7 +56,7 @@ def add_to_zip(
     output_bucket: str,
     file_path_prefix: os.PathLike,
     queue: "JoinableQueue[str | bool]",
-    processed_counter: Optional[Value],
+    processed_counter: type[Value] | None,
 ) -> bool:
     """
     Adds files to an archive, working asynchronously, with another process which will
