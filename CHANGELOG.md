@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.18] - 2023-06-03
+
+### Bug Fixes
+
+- Add default argument to threadpool class
+- Remove stack_info argument from exception logs
+
+### Documentation
+
+- Document the filter method of the FlaskCloudTraceIDFilter class
+
+### Features
+
+- Add opentelemetry tracing to Pub/Sub publish calls
+
+### Refactor
+
+- See if this type annotation works for the Value field
+
 ## [0.1.17] - 2023-06-02
 
 ### Bug Fixes
