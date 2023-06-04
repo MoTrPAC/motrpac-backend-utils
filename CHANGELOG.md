@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2023-06-04
+
+### Bug Fixes
+
+- Remove unnecessary argument from ZipUploadError
+
+### Testing
+
+- Add more tests
+
 ## [0.1.19] - 2023-06-03
 
 ### Bug Fixes
