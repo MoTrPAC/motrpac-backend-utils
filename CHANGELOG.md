@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2023-06-05
+
+### Features
+
+- Allow overriding env var via argument to setup_logging_and_tracing function
+
 ## [0.2.0] - 2023-06-04
 
 ### Bug Fixes
