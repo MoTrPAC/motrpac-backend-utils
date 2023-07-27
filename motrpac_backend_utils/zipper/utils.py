@@ -28,6 +28,8 @@ def get_path_dict(paths: list[str]) -> dict:
     """
     new_path_dict = nested_dict()
     for path in paths:
+        if "Error: " in path:
+            continue
         parts = path.split("/")
         if parts:
             marcher = new_path_dict
