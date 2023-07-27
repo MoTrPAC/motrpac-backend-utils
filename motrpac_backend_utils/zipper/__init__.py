@@ -41,6 +41,14 @@ logger = logging.getLogger()
 tracer = trace.get_tracer(__name__)
 
 
+class BlobNotFoundError(Exception):
+    """Raised when the specified blob could not be found."""
+
+    def __init__(self, blob_name: str, path_name: str) -> None:
+        self.blob_name = blob_name
+        super().__init__(f"Blob {blob_name} could not be found")
+
+
 class ZipProcessResult(TypedDict):
     """
     A dictionary that contains a summary of details regarding the results of a zip process.
@@ -51,6 +59,87 @@ class ZipProcessResult(TypedDict):
     manifest: list[str]
     fileHash: str
     requesters: list[str] | None
+
+
+def zip_file_writer(
+    queue: "JoinableQueue[str | bool]",
+    archive: ZipFile,
+    file_hash: str,
+    processed_counter: type[Value] | None,
+    file_path_prefix: Path,
+):
+    """
+    Writes files to a zip archive.
+
+    :param queue: A `JoinableQueue` object that stores the file paths to be added to the archive.
+    :param archive: A `ZipFile` object representing the archive to which the files will be added.
+    :param file_hash: A string representing the hash of the file being processed.
+    :param processed_counter: A `Value` object representing the number of files processed.
+    :param file_path_prefix: A `Path` object representing the prefix of the file paths to be added to the archive.
+    """
+    manifest: list[str] = []
+
+    while True:
+        # get the latest message from the shared process queue
+        f = queue.get()
+        try:
+            logger.debug(
+                "[File Hash: %s] Received message from queue %s",
+                file_hash,
+                f,
+            )
+            if isinstance(f, BlobNotFoundError):
+                raise f
+            # sentinel to tell the multiprocessing to stop processing
+            if isinstance(f, bool) and not f:
+                queue.task_done()
+                break
+            # create a file in the archive
+            archive.write(
+                f,
+                arcname=f.replace(f"{str(file_path_prefix).rstrip('/')}/", ""),
+            )
+            manifest.append(f)
+            logger.debug("[File Hash: %s] Finished archiving %s", file_hash, f)
+        except BlobNotFoundError as e:
+            logger.exception(
+                "[File Hash: %s] Error while adding file to archive: %s",
+                file_hash,
+                e,
+            )
+            manifest.append(f"{e.blob_name} [Error: unable to retrieve file]")
+        except Exception as e:
+            logger.exception(
+                "[File Hash: %s] Error while adding file to archive: %s",
+                file_hash,
+                e,
+            )
+            manifest.append(f"{f} [Error: unable to retrieve file]")
+        finally:
+            queue.task_done()
+            if processed_counter is not None:
+                with processed_counter.get_lock():
+                    processed_counter.value += 1
+
+    return manifest
+
+
+def patch_zip_blob_metadata(
+    output_bucket: str,
+    zip_loc: str,
+    storage_client: StorageClient,
+) -> None:
+    """
+    Patch the metadata of the zip blob to update the custom time to the current time.
+
+    :param output_bucket: The name of the output bucket where the zip file is stored.
+    :param zip_loc: The location of the zip file.
+    :param storage_client: The Google Cloud Storage client.
+    """
+    bucket = storage_client.get_bucket(output_bucket)
+    zip_blob = bucket.blob(os.path.basename(zip_loc))
+    zip_blob.custom_time = datetime.now(timezone.utc)
+    zip_blob.patch()
 
 
 def add_to_zip(
@@ -83,7 +172,8 @@ def add_to_zip(
             os.getpid(),
         )
         # Process-local instance of the Storage client.
-        upload_buffer_size = 2 ** 8 * 256 * 1024
+        storage_client = StorageClient()
+        upload_buffer_size = 2**8 * 256 * 1024
 
         # Figure out how much memory we have available to allocate the new zip file
         memory = virtual_memory()
@@ -91,39 +181,16 @@ def add_to_zip(
         logger.debug(
             "[File Hash: %s] Allocating %s GB of memory for temp zip file",
             file_hash,
-            round(free_memory / (1024 ** 3), 4),
+            round(free_memory / (1024**3), 4),
         )
-        manifest: list[str] = []
-        storage_client = StorageClient()
 
         # A spooled zip file exists in memory, and is written to disk when it reaches a
         # certain size, which is what we allocated above
         with SpooledTemporaryFile(max_size=free_memory, dir=tmp_dir) as tmp_file:
             with ZipFile(tmp_file, mode="w", compression=ZIP_DEFLATED) as archive:
-                while True:
-                    # get the latest message from the shared process queue
-                    f = queue.get()
-                    logger.debug(
-                        "[File Hash: %s] Received message from queue %s",
-                        file_hash,
-                        f,
-                    )
-                    # sentinel to tell the multiprocessing to stop processing
-                    if isinstance(f, bool) and not f:
-                        queue.task_done()
-                        break
-                    # create a file in the archive
-                    archive.write(
-                        f,
-                        arcname=f.replace(f"{str(file_path_prefix).rstrip('/')}/", ""),
-                    )
-                    manifest.append(f)
-                    queue.task_done()
-                    if processed_counter is not None:
-                        with processed_counter.get_lock():
-                            processed_counter.value += 1
-                    logger.debug("[File Hash: %s] Finished archiving %s", file_hash, f)
-
+                manifest = zip_file_writer(
+                    queue, archive, file_hash, processed_counter, file_path_prefix
+                )
                 manifest_fn = f"{file_hash}.nested.manifest.json"
                 archive.writestr(
                     manifest_fn,
@@ -144,10 +211,7 @@ def add_to_zip(
                 tmp_file.seek(0)
                 shutil.copyfileobj(tmp_file, gs_out, upload_buffer_size)
 
-            bucket = storage_client.get_bucket(output_bucket)
-            zip_blob = bucket.blob(os.path.basename(zip_loc))
-            zip_blob.custom_time = datetime.now(timezone.utc)
-            zip_blob.patch()
+            patch_zip_blob_metadata(output_bucket, zip_loc, storage_client)
 
         return True
 
@@ -175,7 +239,6 @@ class ZipUploadError(Exception):
     """
     An exception class to represent errors that occur during the zip upload process.
     """
-    pass
 
 
 class ZipUploader:
@@ -251,12 +314,12 @@ class ZipUploader:
             self.output_bucket = storage_client.get_bucket(output_bucket)
 
         # the queue to communicate with the separate zip file creation process
-        self.queue: "JoinableQueue[str | bool]" = JoinableQueue()
+        self.queue: JoinableQueue[str | bool | BlobNotFoundError] = JoinableQueue()
         self.message = message
 
         # the location to store the files that are being downloaded/unzipped
         self.file_dl_location = file_dl_location
-        self.tmp_dir_path = scratch_location.joinpath(Path(self.file_hash))
+        self.tmp_dir_path = scratch_location / self.file_hash
 
         # the message from the PubSub pull subscription if that is the source of the
         # ZipUploader
@@ -302,51 +365,47 @@ class ZipUploader:
                 self.log_prefix,
                 f"gs://{self.input_bucket.name}/{dl_object}",
             )
-            # fetch files individually
-            if blob is not None:
-                # get the base name for the file
-                blob_size = blob.size
-                name = Path(dl_object)
-                path = Path(self.file_dl_location).joinpath(name).resolve()
-                path.parent.mkdir(parents=True, exist_ok=True)
+            path = (Path(self.file_dl_location) / dl_object).resolve()
+            if blob is None:
+                raise BlobNotFoundError(dl_object)
+            # get the base name for the file
+            blob_size = blob.size
+            path.parent.mkdir(parents=True, exist_ok=True)
 
-                # check if the file already exists
-                if path.exists():
-                    logger.debug("%s File already exists at %s", self.log_prefix, path)
-                    # does size of remote and local file match (the file may be currently
-                    # downloading)
-                    if path.stat().st_size < blob_size:
-                        logger.debug(
-                            "%s Waiting for other process to download %s",
-                            self.log_prefix,
-                            path,
-                        )
-                    # if it does exist but is currently downloading, wait
-                    while path.stat().st_size < blob_size:
-                        time.sleep(1)
+            # check if the file already exists
+            if path.exists():
+                logger.debug("%s File already exists at %s", self.log_prefix, path)
+                # does size of remote and local file match (the file may be currently
+                # downloading)
+                if path.stat().st_size < blob_size:
                     logger.debug(
-                        "%s Other process finished downloading %s",
+                        "%s Waiting for other process to download %s",
                         self.log_prefix,
                         path,
                     )
-                    return path
 
-                logger.debug("%s Downloading file to %s", self.log_prefix, path)
-                blob.download_to_filename(str(path))
+                # if it does exist but is currently downloading, wait
+                while path.stat().st_size < blob_size:
+                    time.sleep(1)
+                logger.debug(
+                    "%s Other process finished downloading %s",
+                    self.log_prefix,
+                    path,
+                )
                 return path
 
-            return None
+            logger.debug("%s Downloading file to %s", self.log_prefix, path)
+            blob.download_to_filename(str(path))
+            return path
 
     def create_zip(self) -> None:
-        """
-        Creates an async iterator that will yield the files in the zip archive.
-        """
-        futures: list[Future[Path | None]] = []
+        """ """
+        # Asynchronosuly download each file in the request using a threadpool
+        futures: list[Future[Path | None]] = [self.get_file(file) for file in self.files]
 
-        for file in self.files:
-            futures.append(self.get_file(file))
-
+        # Create an atomic counter to track the number of files that have been processed
         atomic_counter = Value("i", 0, lock=True)
+        # Start a separate process to add files to the zip file
         p = Process(
             target=add_to_zip,
             kwargs={
@@ -360,8 +419,16 @@ class ZipUploader:
         )
         p.start()
 
+        # as the files finish downloading, add them to the queue, ensuring that
+        # io time is not wasted waiting for files to download
         for i, fut in enumerate(as_completed(futures)):
-            tmp_file_path = str(fut.result())
+            try:
+                tmp_file_path = fut.result()
+                # if the file does not exist in GCS (which is when None is returned), skip it
+            except BlobNotFoundError as e:
+                self.queue.put(e)
+
+            tmp_file_path = str(tmp_file_path)
             self.queue.put(tmp_file_path)
             logger.debug(
                 "%s Finished downloading file %s",
@@ -372,7 +439,7 @@ class ZipUploader:
             if self.message is not None:
                 self.check_message_deadline(i)
 
-        # wait for the add to zip process to finish`
+        # wait for the add to zip process to finish
         while True:
             time.sleep(5)
             with atomic_counter.get_lock():
