@@ -56,7 +56,7 @@ rm -f $PROTOC_ZIP
 │   ├── zipper
 │   │   ├── cache.py # functions for caching requests/other info used by the zipper
 │   │   ├── utils.py # utility functions used by the zipper
-│   │   └── zipper.py # the zipper class
+│   │   └── __init__.py # the ZipUploader class
 │   ├── messages.py # contains functions for messaging in the backend
 │   ├── requester.py # contains Requester class
 │   ├── setup.py # contains functions for setting up the backend (tracing and logging)

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from motrpac_backend_utils.zipper.zipper import estimate_remaining_time, ZipUploader
+from motrpac_backend_utils.zipper import estimate_remaining_time, ZipUploader
 
 
 class TestEstimateRemainingTime(unittest.TestCase):
