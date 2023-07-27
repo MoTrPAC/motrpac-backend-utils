@@ -16,17 +16,17 @@ class TestThreadpoolDecorator(unittest.TestCase):
     def test_threadpool_decorator(self):
         # Test using the default thread pool
         squared_num = square(5)
-        self.assertEqual(squared_num.result(), 25)
+        assert squared_num.result() == 25
 
         # Test using a custom thread pool
         custom_pool = ThreadPoolExecutor(max_workers=2)
 
-        @threadpool(pool=custom_pool)
+        @threadpool
         def re_square(x: int) -> int:
             return x**2
 
         squared_num = re_square(3)
-        self.assertEqual(squared_num.result(), 9)
+        assert squared_num.result() == 9
 
         # Clean up the custom thread pool
         custom_pool.shutdown()
