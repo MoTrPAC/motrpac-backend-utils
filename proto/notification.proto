@@ -2,12 +2,9 @@ syntax = "proto3";
 
 package fdl_svc;
 
-message UserNotificationMessage {
-  message Requester {
-    string email = 1;
-    string name = 2;
-  }
+import "common.proto";
 
+message UserNotificationMessage {
   // details of the requester
   Requester requester = 1;
   string zipfile = 2;
