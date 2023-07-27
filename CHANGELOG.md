@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2023-07-27
+
+### Features
+
+- Add custom BlobNotFoundError class and modify blob handling
+- [**breaking**] Extracted common Requester class from Message protobufs
+
+### Refactor
+
+- Remove deprecated 'zipper' file, move content to '__init__' module
+- Threadpool decorator and its tests
+
 ## [0.2.1] - 2023-06-05
 
 ### Features
