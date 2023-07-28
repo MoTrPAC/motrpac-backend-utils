@@ -8,10 +8,13 @@ from typing import NamedTuple, TypeVar, Any
 
 from google.protobuf.message import Message
 
-from .proto import Requester as _Requester
+from .proto import FileDownloadMessage, UserNotificationMessage
 
 
 T = TypeVar("T", bound="Requester")
+U = TypeVar(
+    "U", type[UserNotificationMessage.Requester], type[FileDownloadMessage.Requester],
+)
 
 
 class Requester(NamedTuple):
@@ -22,16 +25,16 @@ class Requester(NamedTuple):
     name: str
     email: str
 
-    def to_proto(self) -> Message:
+    def to_proto(self, parent_cls: U) -> Message:
         """
         Converts this Requester object to a protobuf object.
         """
-        return _Requester(name=self.name, email=self.email)
+        return parent_cls(name=self.name, email=self.email)
 
     @classmethod
     def from_proto(
         cls: type[T],
-        proto: _Requester,
+        proto: UserNotificationMessage.Requester | FileDownloadMessage.Requester,
     ) -> T:
         """
         Converts a protobuf object to this Requester object.

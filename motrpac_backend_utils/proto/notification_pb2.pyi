@@ -1,4 +1,3 @@
-import common_pb2 as _common_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -8,10 +7,17 @@ DESCRIPTOR: _descriptor.FileDescriptor
 
 class UserNotificationMessage(_message.Message):
     __slots__ = ["requester", "zipfile", "files"]
+    class Requester(_message.Message):
+        __slots__ = ["email", "name"]
+        EMAIL_FIELD_NUMBER: _ClassVar[int]
+        NAME_FIELD_NUMBER: _ClassVar[int]
+        email: str
+        name: str
+        def __init__(self, email: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
     REQUESTER_FIELD_NUMBER: _ClassVar[int]
     ZIPFILE_FIELD_NUMBER: _ClassVar[int]
     FILES_FIELD_NUMBER: _ClassVar[int]
-    requester: _common_pb2.Requester
+    requester: UserNotificationMessage.Requester
     zipfile: str
     files: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, requester: _Optional[_Union[_common_pb2.Requester, _Mapping]] = ..., zipfile: _Optional[str] = ..., files: _Optional[_Iterable[str]] = ...) -> None: ...
+    def __init__(self, requester: _Optional[_Union[UserNotificationMessage.Requester, _Mapping]] = ..., zipfile: _Optional[str] = ..., files: _Optional[_Iterable[str]] = ...) -> None: ...

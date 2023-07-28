@@ -37,7 +37,7 @@ class TestDecodeFileDownloadMessage(unittest.TestCase):
         message = FileDownloadMessage()
         message.files.extend(files)
         message.requester.CopyFrom(
-            Requester(name=name, email=email).to_proto(),
+            Requester(name=name, email=email).to_proto(FileDownloadMessage.Requester)
         )
         encoded_message = message.SerializeToString()
 
@@ -45,9 +45,9 @@ class TestDecodeFileDownloadMessage(unittest.TestCase):
         decoded_files, requester = decode_file_download_message(encoded_message)
 
         # Assert
-        assert decoded_files == files
-        assert requester.name == name
-        assert requester.email == email
+        self.assertEqual(decoded_files, files)
+        self.assertEqual(requester.name, name)
+        self.assertEqual(requester.email, email)
 
     def test_decode_file_download_message_invalid_message(self):
         # Arrange
@@ -72,14 +72,14 @@ class TestPublishFileDownloadMessage(unittest.TestCase):
         topic_id = "my-topic"
 
         with tracer.start_as_current_span(
-            "test_publish_file_download_message_success",
+            "test_publish_file_download_message_success"
         ) as span:
             span.set_attribute("printed_string", "hello")
             publish_file_download_message(name, email, files, topic_id, self.mock_client)
 
         # Assert
         self.mock_client.publish.assert_called_once_with(
-            topic_id, mock.ANY, **{"googclient_OpenTelemetrySpanContext": mock.ANY},
+            topic_id, mock.ANY, **{"googclient_OpenTelemetrySpanContext": mock.ANY}
         )
         self.mock_future.result.assert_called_once()
 
@@ -94,13 +94,14 @@ class TestPublishFileDownloadMessage(unittest.TestCase):
         self.mock_client.publish.side_effect = error
 
         # Act & Assert
-        with self.assertRaises(GoogleAPICallError), tracer.start_as_current_span(
-            "test_publish_file_download_message_failure",
-        ) as span:
-            span.set_attribute("printed_string", "hello")
-            publish_file_download_message(
-                name, email, files, topic_id, self.mock_client,
-            )
+        with self.assertRaises(GoogleAPICallError):
+            with tracer.start_as_current_span(
+                "test_publish_file_download_message_failure"
+            ) as span:
+                span.set_attribute("printed_string", "hello")
+                publish_file_download_message(
+                    name, email, files, topic_id, self.mock_client
+                )
 
 
 if __name__ == "__main__":

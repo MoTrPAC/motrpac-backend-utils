@@ -63,7 +63,7 @@ def publish_file_download_message(
         message = FileDownloadMessage()
         message.files.extend(files)
         message.requester.CopyFrom(
-            Requester(name=name, email=email).to_proto(),
+            Requester(name=name, email=email).to_proto(FileDownloadMessage.Requester),
         )
         # Encode the data according to the message serialization type.
         msg_data = message.SerializeToString()
@@ -116,7 +116,9 @@ def send_notification_message(
         # create the ProtoBuf message
         message = UserNotificationMessage()
         message.requester.CopyFrom(
-            Requester(name=name, email=email).to_proto(),
+            Requester(name=name, email=email).to_proto(
+                UserNotificationMessage.Requester,
+            ),
         )
         message.zipfile = output_filename
         message.files.extend(manifest)

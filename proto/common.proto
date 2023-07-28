@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package fdl_svc;
-
-message Requester {
-  string email = 1;
-  string name = 2;
-}
