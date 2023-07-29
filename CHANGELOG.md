@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### Bug Fixes
+
+- Remove potential bug in zipper utility
+
 ## [0.4.0] - 2023-07-28
 
 ### Features
