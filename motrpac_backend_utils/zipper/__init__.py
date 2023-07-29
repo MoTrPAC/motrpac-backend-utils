@@ -71,11 +71,13 @@ def zip_file_writer(
     """
     Writes files to a zip archive.
 
-    :param queue: A `JoinableQueue` object that stores the file paths to be added to the archive.
-    :param archive: A `ZipFile` object representing the archive to which the files will be added.
+    :param queue: A `JoinableQueue` object of the file paths to be added to the archive.
+    :param archive: A `ZipFile` object representing the archive to which the files will
+        be added.
     :param file_hash: A string representing the hash of the file being processed.
     :param processed_counter: A `Value` object representing the number of files processed.
-    :param file_path_prefix: A `Path` object representing the prefix of the file paths to be added to the archive.
+    :param file_path_prefix: A `Path` object representing the prefix of the file paths
+        to be added to the archive.
     """
     manifest: list[str] = []
 
@@ -89,10 +91,9 @@ def zip_file_writer(
                 f,
             )
             if isinstance(f, BlobNotFoundError):
-                raise f
+                raise f  # noqa: TRY301
             # sentinel to tell the multiprocessing to stop processing
             if isinstance(f, bool) and not f:
-                queue.task_done()
                 break
             # create a file in the archive
             archive.write(
@@ -103,16 +104,14 @@ def zip_file_writer(
             logger.debug("[File Hash: %s] Finished archiving %s", file_hash, f)
         except BlobNotFoundError as e:
             logger.exception(
-                "[File Hash: %s] Error while adding file to archive: %s",
+                "[File Hash: %s] Error while adding file to archive",
                 file_hash,
-                e,
             )
             manifest.append(f"{e.blob_name} [Error: unable to retrieve file]")
         except Exception as e:
             logger.exception(
-                "[File Hash: %s] Error while adding file to archive: %s",
+                "[File Hash: %s] Error while adding file to archive",
                 file_hash,
-                e,
             )
             manifest.append(f"{f} [Error: unable to retrieve file]")
         finally:
@@ -160,9 +159,9 @@ def add_to_zip(
     :param file_path_prefix: The local path prefix to strip from the local file paths
     :param queue: A queue to communicate with the parent process
     :param processed_counter: A counter to keep track of how many files have been
-    processed
+        processed
     :returns: True when the process has finished (there are no more messages to process/
-    the queue has delivered a sentinel boolean value of False)
+        the queue has delivered a sentinel boolean value of False)
     """
     file_hash = os.path.basename(os.path.splitext(zip_loc)[0])
     with tracer.start_as_current_span(file_hash):
