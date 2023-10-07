@@ -546,6 +546,7 @@ class ZipUploader:
             for requester in self.requesters:
                 send_notification_message(
                     requester.name,
+                    requester.id,
                     requester.email,
                     self.output_path,
                     self.files,

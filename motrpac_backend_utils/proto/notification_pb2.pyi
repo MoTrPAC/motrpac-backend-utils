@@ -8,12 +8,14 @@ DESCRIPTOR: _descriptor.FileDescriptor
 class UserNotificationMessage(_message.Message):
     __slots__ = ["requester", "zipfile", "files"]
     class Requester(_message.Message):
-        __slots__ = ["email", "name"]
+        __slots__ = ["email", "name", "id"]
         EMAIL_FIELD_NUMBER: _ClassVar[int]
         NAME_FIELD_NUMBER: _ClassVar[int]
+        ID_FIELD_NUMBER: _ClassVar[int]
         email: str
         name: str
-        def __init__(self, email: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
+        id: str
+        def __init__(self, email: _Optional[str] = ..., name: _Optional[str] = ..., id: _Optional[str] = ...) -> None: ...
     REQUESTER_FIELD_NUMBER: _ClassVar[int]
     ZIPFILE_FIELD_NUMBER: _ClassVar[int]
     FILES_FIELD_NUMBER: _ClassVar[int]

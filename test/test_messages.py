@@ -33,11 +33,14 @@ class TestDecodeFileDownloadMessage(unittest.TestCase):
         # Arrange
         files = ["file1.txt", "file2.txt"]
         name = "John Doe"
+        user_id = "1234567890"
         email = "johndoe@example.com"
         message = FileDownloadMessage()
         message.files.extend(files)
         message.requester.CopyFrom(
-            Requester(name=name, email=email).to_proto(FileDownloadMessage.Requester)
+            Requester(name=name, email=email, id=user_id).to_proto(
+                FileDownloadMessage.Requester
+            )
         )
         encoded_message = message.SerializeToString()
 
@@ -67,6 +70,7 @@ class TestPublishFileDownloadMessage(unittest.TestCase):
     def test_publish_file_download_message_success(self):
         # Arrange
         name = "John Doe"
+        user_id = "1234567890"
         email = "johndoe@example.com"
         files = ["file1.txt", "file2.txt"]
         topic_id = "my-topic"
@@ -75,7 +79,14 @@ class TestPublishFileDownloadMessage(unittest.TestCase):
             "test_publish_file_download_message_success"
         ) as span:
             span.set_attribute("printed_string", "hello")
-            publish_file_download_message(name, email, files, topic_id, self.mock_client)
+            publish_file_download_message(
+                name,
+                user_id,
+                email,
+                files,
+                topic_id,
+                self.mock_client,
+            )
 
         # Assert
         self.mock_client.publish.assert_called_once_with(
@@ -86,6 +97,7 @@ class TestPublishFileDownloadMessage(unittest.TestCase):
     def test_publish_file_download_message_failure(self):
         # Arrange
         name = "John Doe"
+        user_id = "1234567890"
         email = "johndoe@example.com"
         files = ["file1.txt", "file2.txt"]
         topic_id = "my-topic"
@@ -100,7 +112,7 @@ class TestPublishFileDownloadMessage(unittest.TestCase):
             ) as span:
                 span.set_attribute("printed_string", "hello")
                 publish_file_download_message(
-                    name, email, files, topic_id, self.mock_client
+                    name, user_id, email, files, topic_id, self.mock_client
                 )
 
 

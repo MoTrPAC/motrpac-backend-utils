@@ -43,6 +43,7 @@ def decode_file_download_message(message: bytes) -> tuple[list[str], Requester]:
 
 def publish_file_download_message(
     name: str,
+    user_id: str,
     email: str,
     files: list[str],
     topic_id: str,
@@ -52,6 +53,7 @@ def publish_file_download_message(
     Publishes a FileDownloadMessage protobuf message to the topic id provided.
 
     :param name: The name of the requester
+    :param user_id: The ID of the requester
     :param email: The email of the requester
     :param files: A list of files that are being downloaded
     :param topic_id: The Pub/Sub topic to publish messages to
@@ -63,7 +65,9 @@ def publish_file_download_message(
         message = FileDownloadMessage()
         message.files.extend(files)
         message.requester.CopyFrom(
-            Requester(name=name, email=email).to_proto(FileDownloadMessage.Requester),
+            Requester(name=name, email=email, id=user_id).to_proto(
+                FileDownloadMessage.Requester
+            ),
         )
         # Encode the data according to the message serialization type.
         msg_data = message.SerializeToString()
@@ -96,6 +100,7 @@ def publish_file_download_message(
 
 def send_notification_message(
     name: str,
+    user_id: str,
     email: str,
     output_filename: str,
     manifest: list[str],
@@ -106,6 +111,7 @@ def send_notification_message(
     Publishes a message to the topic.
 
     :param name: The name of the requester
+    :param user_id: The ID of the requester
     :param email: The email of the requester
     :param output_filename: The name of the output zip file
     :param manifest: A list of files that were requested
@@ -116,7 +122,7 @@ def send_notification_message(
         # create the ProtoBuf message
         message = UserNotificationMessage()
         message.requester.CopyFrom(
-            Requester(name=name, email=email).to_proto(
+            Requester(name=name, email=email, id=user_id).to_proto(
                 UserNotificationMessage.Requester,
             ),
         )

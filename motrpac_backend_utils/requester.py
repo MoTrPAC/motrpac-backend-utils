@@ -13,7 +13,9 @@ from .proto import FileDownloadMessage, UserNotificationMessage
 
 T = TypeVar("T", bound="Requester")
 U = TypeVar(
-    "U", type[UserNotificationMessage.Requester], type[FileDownloadMessage.Requester],
+    "U",
+    type[UserNotificationMessage.Requester],
+    type[FileDownloadMessage.Requester],
 )
 
 
@@ -24,12 +26,13 @@ class Requester(NamedTuple):
 
     name: str
     email: str
+    id: str
 
     def to_proto(self, parent_cls: U) -> Message:
         """
         Converts this Requester object to a protobuf object.
         """
-        return parent_cls(name=self.name, email=self.email)
+        return parent_cls(name=self.name, email=self.email, id=self.id)
 
     @classmethod
     def from_proto(
@@ -39,13 +42,13 @@ class Requester(NamedTuple):
         """
         Converts a protobuf object to this Requester object.
         """
-        return cls(name=proto.name, email=proto.email)
+        return cls(name=proto.name, email=proto.email, id=proto.id)
 
     def __repr__(self) -> str:
         """
         Returns a string representation of the requester.
         """
-        return f"{self.name} <{self.email}>"
+        return f"{self.name} ({self.id}) <{self.email}>"
 
     # implementing the __hash__ and __eq__ methods allows us to use this object as a
     # member of a set
@@ -55,9 +58,9 @@ class Requester(NamedTuple):
 
         :return: The hash of the requester
         """
-        return hash((self.name, self.email))
+        return hash((self.name, self.email, self.id))
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, type(self)):
             raise NotImplementedError
-        return self.name == other.name and self.email == other.email
+        return self.name == other.name and self.email == other.email and self.id == other.id

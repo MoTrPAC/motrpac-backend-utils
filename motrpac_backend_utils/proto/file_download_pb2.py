@@ -13,16 +13,15 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13\x66ile_download.proto\x12\x07\x66\x64l_svc\"\x89\x01\n\x13\x46ileDownloadMessage\x12\x39\n\trequester\x18\x01 \x01(\x0b\x32&.fdl_svc.FileDownloadMessage.Requester\x12\r\n\x05\x66iles\x18\x02 \x03(\t\x1a(\n\tRequester\x12\r\n\x05\x65mail\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\tb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13\x66ile_download.proto\x12\x07\x66\x64l_svc\"\x95\x01\n\x13\x46ileDownloadMessage\x12\x39\n\trequester\x18\x01 \x01(\x0b\x32&.fdl_svc.FileDownloadMessage.Requester\x12\r\n\x05\x66iles\x18\x02 \x03(\t\x1a\x34\n\tRequester\x12\r\n\x05\x65mail\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\n\n\x02id\x18\x03 \x01(\tb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'file_download_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
-
   DESCRIPTOR._options = None
   _globals['_FILEDOWNLOADMESSAGE']._serialized_start=33
-  _globals['_FILEDOWNLOADMESSAGE']._serialized_end=170
+  _globals['_FILEDOWNLOADMESSAGE']._serialized_end=182
   _globals['_FILEDOWNLOADMESSAGE_REQUESTER']._serialized_start=130
-  _globals['_FILEDOWNLOADMESSAGE_REQUESTER']._serialized_end=170
+  _globals['_FILEDOWNLOADMESSAGE_REQUESTER']._serialized_end=182
 # @@protoc_insertion_point(module_scope)
