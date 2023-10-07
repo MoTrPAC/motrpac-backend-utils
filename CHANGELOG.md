@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2023-10-07
+
+### Features
+
+- Add user id field to protobufs
+
+### Miscellaneous Tasks
+
+- Make bump version targets DRY
+
+### Build
+
+- Add version patch automation to Makefile
+
 ## [0.4.1] - 2023-07-29
 
 ### Bug Fixes
