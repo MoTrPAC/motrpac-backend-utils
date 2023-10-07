@@ -41,10 +41,9 @@ venv-init:
 protobuf-init:
 	protoc --proto_path=$(CWD)/$(PROTO_PATH) --python_out=$(CWD)/$(PROTO_DIR) --pyi_out=$(CWD)/$(PROTO_DIR) file_download.proto notification.proto
 
-.PHONY: version-patch
-# bump patch version
-version-patch:
-	poetry version patch ; \
+# Define a function for common steps in version bumping
+define bump_version
+	poetry version $(1) ; \
 	VERSION=$$(poetry version | sed "s/motrpac-backend-utils[[:space:]]//g") ; \
 	git add pyproject.toml ; \
 	git commit -m "chore(release): bump version to $$VERSION" ; \
@@ -52,3 +51,12 @@ version-patch:
 	git cliff > CHANGELOG.md ; \
 	git add CHANGELOG.md ; \
 	git commit -m "chore(release): update CHANGELOG.md"
+endef
+
+# Use the function for patch and minor version bumping targets
+
+version-patch:
+	$(call bump_version,patch)
+
+version-minor:
+	$(call bump_version,minor)
