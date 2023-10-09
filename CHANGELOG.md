@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2023-10-09
+
+### Features
+
+- Update protobufs to make the ID field optional
+
 ## [0.5.0] - 2023-10-07
 
 ### Features
