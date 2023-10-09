@@ -26,7 +26,7 @@ class Requester(NamedTuple):
 
     name: str
     email: str
-    id: str
+    id: str | None
 
     def to_proto(self, parent_cls: U) -> Message:
         """

@@ -43,7 +43,7 @@ def decode_file_download_message(message: bytes) -> tuple[list[str], Requester]:
 
 def publish_file_download_message(
     name: str,
-    user_id: str,
+    user_id: str | None,
     email: str,
     files: list[str],
     topic_id: str,
@@ -100,7 +100,7 @@ def publish_file_download_message(
 
 def send_notification_message(
     name: str,
-    user_id: str,
+    user_id: str | None,
     email: str,
     output_filename: str,
     manifest: list[str],

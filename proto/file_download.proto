@@ -6,7 +6,7 @@ message FileDownloadMessage {
   message Requester {
     string email = 1;
     string name = 2;
-    string id = 3;
+    optional string id = 3;
   }
 
   Requester requester = 1;
