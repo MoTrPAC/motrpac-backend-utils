@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "motrpac-backend-utils"
-version = "0.6.0"
+version = "0.6.1"
 description = ""
 authors = ["Mihir Samdarshi <msamdars@stanford.edu>"]
 packages = [{ include = "motrpac_backend_utils" }]
