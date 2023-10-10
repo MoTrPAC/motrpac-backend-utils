@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - 2023-10-10
+
+### Miscellaneous Tasks
+
+- Code cleanup
+
 ## [0.6.0] - 2023-10-09
 
 ### Features
