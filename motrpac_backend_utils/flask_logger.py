@@ -149,7 +149,7 @@ class FlaskCloudTraceIDFilter(logging.Filter):
     Log filter to inject the current request id of the request under `log_record.request_id`.
     """
 
-    def filter(self, log_record: logging.LogRecord):
+    def filter(self, log_record: logging.LogRecord) -> logging.LogRecord:
         """
         Although filters are supposed to be used to determine whether to log or not,
         we are using it to inject the request id in the log record.

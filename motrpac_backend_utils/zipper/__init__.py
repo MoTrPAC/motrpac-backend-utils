@@ -98,6 +98,8 @@ def zip_file_writer(
             # create a file in the archive
             archive.write(
                 f,
+                # we want to replace "/tmp/file_cache" or whatever the base name of the
+                # location of the downloaded files are
                 arcname=f.replace(f"{str(file_path_prefix).rstrip('/')}/", ""),
             )
             manifest.append(f)
@@ -108,7 +110,7 @@ def zip_file_writer(
                 file_hash,
             )
             manifest.append(f"{e.blob_name} [Error: unable to retrieve file]")
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "[File Hash: %s] Error while adding file to archive",
                 file_hash,
@@ -145,7 +147,7 @@ def add_to_zip(
     tmp_dir: str,
     zip_loc: str,
     output_bucket: str,
-    file_path_prefix: os.PathLike,
+    file_path_prefix: Path,
     queue: "JoinableQueue[str | bool]",
     processed_counter: type[Value] | None,
 ) -> bool:
@@ -188,7 +190,11 @@ def add_to_zip(
         with SpooledTemporaryFile(max_size=free_memory, dir=tmp_dir) as tmp_file:
             with ZipFile(tmp_file, mode="w", compression=ZIP_DEFLATED) as archive:
                 manifest = zip_file_writer(
-                    queue, archive, file_hash, processed_counter, file_path_prefix
+                    queue,
+                    archive,
+                    file_hash,
+                    processed_counter,
+                    file_path_prefix,
                 )
                 manifest_fn = f"{file_hash}.nested.manifest.json"
                 archive.writestr(
@@ -398,8 +404,16 @@ class ZipUploader:
             return path
 
     def create_zip(self) -> None:
-        """ """
-        # Asynchronosuly download each file in the request using a threadpool
+        """
+        Create a process that will zip files. This process will watch a queue for
+        messages sent from the queue and write them to the archive. This method will
+        concurrently download the files that a user has requested to download and, once
+        each file has downloaded, will place a message in the queue with the local\
+        file path of the zipped file.
+
+        :return:
+        """
+        # Asynchronously download each file in the request using a threadpool
         futures: list[Future[Path | None]] = [self.get_file(file) for file in self.files]
 
         # Create an atomic counter to track the number of files that have been processed
@@ -419,28 +433,32 @@ class ZipUploader:
         p.start()
 
         # as the files finish downloading, add them to the queue, ensuring that
-        # io time is not wasted waiting for files to download
+        # time is not wasted waiting for files to download
         for i, fut in enumerate(as_completed(futures)):
             try:
                 tmp_file_path = fut.result()
+                tmp_file_path = str(tmp_file_path)
+                self.queue.put(tmp_file_path)
+                logger.debug(
+                    "%s Finished downloading file %s",
+                    self.log_prefix,
+                    tmp_file_path,
+                )
                 # if the file does not exist in GCS (which is when None is returned), skip it
             except BlobNotFoundError as e:
                 self.queue.put(e)
 
-            tmp_file_path = str(tmp_file_path)
-            self.queue.put(tmp_file_path)
-            logger.debug(
-                "%s Finished downloading file %s",
-                self.log_prefix,
-                tmp_file_path,
-            )
-            # check if the time is getting dangerously close to the timeout
+            # If this class has a message (e.g. we are pulling messages from the Pub/Sub
+            # subscription rather than receiving `Push`-ed messages), check if the time
+            # is getting dangerously close to the timeout
             if self.message is not None:
                 self.check_message_deadline(i)
 
         # wait for the add to zip process to finish
         while True:
             time.sleep(5)
+            # while waiting for the zip process to finish log the number of files
+            # and if running in Pull mode, extend the message deadline if needed
             with atomic_counter.get_lock():
                 current_num_files = int(deepcopy(atomic_counter.value))
             logger.debug(

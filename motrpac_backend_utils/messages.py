@@ -66,7 +66,7 @@ def publish_file_download_message(
         message.files.extend(files)
         message.requester.CopyFrom(
             Requester(name=name, email=email, id=user_id).to_proto(
-                FileDownloadMessage.Requester
+                FileDownloadMessage.Requester,
             ),
         )
         # Encode the data according to the message serialization type.
@@ -77,13 +77,13 @@ def publish_file_download_message(
 
         # Create a new span and yield it
         with tracer.start_as_current_span(
-            f"{topic_id} publisher", attributes={"data": str(msg_data)}
+            f"{topic_id} publisher", attributes={"data": str(msg_data)},
         ) as span:
             try:
                 attrs = {
                     "googclient_OpenTelemetrySpanContext": json.dumps(
-                        span.get_span_context().__dict__
-                    )
+                        span.get_span_context().__dict__,
+                    ),
                 }
                 future = client.publish(topic_id, msg_data, **attrs)
             except GoogleAPICallError as error:
