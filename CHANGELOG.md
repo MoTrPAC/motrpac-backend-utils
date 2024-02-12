@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2] - 2024-02-12
+
+### Miscellaneous Tasks
+
+- Bump package versions
+
 ## [0.6.1] - 2023-10-10
 
 ### Miscellaneous Tasks
@@ -38,14 +44,9 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-- [**breaking**] Revert "extracted common Requester class from Message protobufs"
-
-## [0.3.0] - 2023-07-27
-
-### Features
-
 - Add custom BlobNotFoundError class and modify blob handling
 - [**breaking**] Extracted common Requester class from Message protobufs
+- [**breaking**] Revert "extracted common Requester class from Message protobufs"
 
 ### Refactor
 
