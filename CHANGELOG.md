@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.3] - 2024-02-14
+
+### Features
+
+- Add CloudTraceIDFilter to log records
+
+### Miscellaneous Tasks
+
+- Update copyright comments on all files
+
 ## [0.6.2] - 2024-02-12
 
 ### Miscellaneous Tasks
