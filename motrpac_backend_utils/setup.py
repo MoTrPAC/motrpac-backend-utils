@@ -6,6 +6,7 @@ import logging
 import os
 
 from google.cloud.logging import Client as LoggingClient
+from google.cloud.logging_v2.handlers import setup_logging
 from opentelemetry import trace
 from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
@@ -14,6 +15,8 @@ from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.cloud_trace_propagator import CloudTraceFormatPropagator
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+from .flask_logger import FlaskCloudTraceIDFilter
 
 
 IS_PROD = bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0")))
@@ -35,14 +38,15 @@ def setup_logging_and_tracing(
     """
     if is_prod:
         client = LoggingClient()
-        client.setup_logging(log_level=log_level)
+        handler = client.get_default_handler()
+        handler.addFilter(FlaskCloudTraceIDFilter())
+        setup_logging(handler, log_level=log_level)
         logging.getLogger("requests").setLevel(logging.WARNING)
         logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
         logging.getLogger("urllib3.util.retry").setLevel(logging.WARNING)
     else:
         log_format = "{levelname} {asctime} {name}:{funcName}:{lineno} {message}"
         logging.basicConfig(
-            style="{",
             format=log_format,
             datefmt="%I:%M:%S %p",
             level=log_level,
