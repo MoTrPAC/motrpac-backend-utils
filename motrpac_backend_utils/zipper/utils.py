@@ -1,4 +1,4 @@
-#  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+#  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 
 from collections import defaultdict
 from typing import Any

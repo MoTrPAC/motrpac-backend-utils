@@ -5,7 +5,7 @@ completion.
 
 When using this, make sure that package feature "zipper" is used.
 """
-#  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+#  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 import json
 import logging
 import math

@@ -1,4 +1,4 @@
-#  Copyright (c) 2023. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+#  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 """
 Flask extension to parse or generate the id of each request.
 """

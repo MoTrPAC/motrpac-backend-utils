@@ -1,4 +1,4 @@
-#  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+#  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 """
 A utility module for setting up logging and tracing.
 """

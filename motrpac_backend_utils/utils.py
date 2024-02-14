@@ -1,4 +1,4 @@
-#  Copyright (c) 2022. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+#  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 """
 Utility functions for the MoTrPAC backend utility function package. Recursive utilities, if you will.
 """
