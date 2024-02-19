@@ -45,7 +45,7 @@ def setup_logging_and_tracing(
         logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
         logging.getLogger("urllib3.util.retry").setLevel(logging.WARNING)
     else:
-        log_format = "%(levelname) %(asctime)s %(name):%(funcName):%(lineno) %(message)"
+        log_format = "%(levelname)s %(asctime)s %(name)s:%(funcName)s:%(lineno)s %(message)s"
         logging.basicConfig(
             format=log_format,
             datefmt="%I:%M:%S %p",
