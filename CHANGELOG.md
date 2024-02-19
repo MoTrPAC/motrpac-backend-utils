@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.5] - 2024-02-19
+
+### Bug Fixes
+
+- Fix logging format (fr this time)
+
+### Miscellaneous Tasks
+
+- Update package deps
+
 ## [0.6.4] - 2024-02-19
 
 ### Bug Fixes
