@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.4] - 2024-02-19
+
+### Bug Fixes
+
+- Fix logging format
+
 ## [0.6.3] - 2024-02-14
 
 ### Features
@@ -54,9 +60,14 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
+- [**breaking**] Revert "extracted common Requester class from Message protobufs"
+
+## [0.3.0] - 2023-07-27
+
+### Features
+
 - Add custom BlobNotFoundError class and modify blob handling
 - [**breaking**] Extracted common Requester class from Message protobufs
-- [**breaking**] Revert "extracted common Requester class from Message protobufs"
 
 ### Refactor
 
