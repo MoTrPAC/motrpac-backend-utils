@@ -3,11 +3,11 @@
 Flask extension to parse or generate the id of each request.
 """
 import logging
-from typing import Any
 from collections.abc import Callable
+from typing import Any
 
+import flask
 from flask import request, g, current_app, Flask
-
 
 logger = logging.getLogger(__name__)
 
@@ -88,12 +88,18 @@ def flask_ctx_get_request_id() -> str | None:
 
     :return: The id or None if not found.
     """
-    from flask import _app_ctx_stack as stack  # We do not support < Flask 0.9
+    # from flask import _app_ctx_stack as stack  # We do not support < Flask 0.9
+    if hasattr(flask, "globals") and hasattr(flask.globals, "request_ctx"):
+        # update session for Flask >= 2.2
+        ctx = flask.globals.request_ctx._get_current_object()
+    else:  # pragma: no cover
+        # update session for Flask < 2.2
+        ctx = flask._request_ctx_stack.top
 
-    if stack.top is None:
-        raise ExecutedOutsideContextError
+    if ctx is None:
+        raise ExecutedOutsideContextError()
 
-    g_object_attr = stack.top.app.config["LOG_REQUEST_ID_G_OBJECT_ATTRIBUTE"]
+    g_object_attr = ctx.app.config["LOG_REQUEST_ID_G_OBJECT_ATTRIBUTE"]
     return g.get(g_object_attr, None)
 
 
