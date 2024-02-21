@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.6] - 2024-02-21
+
+### Bug Fixes
+
+- Update Flask logger for Flask >3
+
 ## [0.6.5] - 2024-02-19
 
 ### Bug Fixes
