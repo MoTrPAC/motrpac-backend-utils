@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.7] - 2024-02-23
+
+### Miscellaneous Tasks
+
+- Update protobuf files
+
 ## [0.6.6] - 2024-02-21
 
 ### Bug Fixes
