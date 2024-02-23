@@ -6,9 +6,9 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class FileDownloadMessage(_message.Message):
-    __slots__ = ["requester", "files"]
+    __slots__ = ("requester", "files")
     class Requester(_message.Message):
-        __slots__ = ["email", "name", "id"]
+        __slots__ = ("email", "name", "id")
         EMAIL_FIELD_NUMBER: _ClassVar[int]
         NAME_FIELD_NUMBER: _ClassVar[int]
         ID_FIELD_NUMBER: _ClassVar[int]
