@@ -13,7 +13,7 @@ def square(x: int) -> int:
 
 
 class TestThreadpoolDecorator(unittest.TestCase):
-    def test_threadpool_decorator(self):
+    def test_threadpool_decorator(self) -> None:
         # Test using the default thread pool
         squared_num = square(5)
         assert squared_num.result() == 25

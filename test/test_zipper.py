@@ -9,7 +9,7 @@ from motrpac_backend_utils.zipper import estimate_remaining_time, ZipUploader
 
 
 class TestEstimateRemainingTime(unittest.TestCase):
-    def test_estimate_remaining_time(self):
+    def test_estimate_remaining_time(self) -> None:
         # Arrange
         current_file_count = 5
         total_file_count = 20
@@ -17,21 +17,21 @@ class TestEstimateRemainingTime(unittest.TestCase):
 
         # Act
         remaining_time = estimate_remaining_time(
-            current_file_count, total_file_count, elapsed_time
+            current_file_count, total_file_count, elapsed_time,
         )
 
         # Assert
         expected_remaining_time = math.ceil(
             (elapsed_time / current_file_count)
             * (total_file_count - current_file_count)
-            * 1.5
+            * 1.5,
         )
         expected_remaining_time = min(expected_remaining_time, 600)
-        self.assertEqual(remaining_time, expected_remaining_time)
+        assert remaining_time == expected_remaining_time
 
 
 class TestZipUploader(unittest.TestCase):
-    def test_create_zip(self):
+    def test_create_zip(self) -> None:
         files = ["file1.txt", "file2.txt"]
         file_hash = "hash123"
         notification_url = "https://example.com/notification"

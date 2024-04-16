@@ -70,6 +70,7 @@ class TraceIdInjectionFilter(logging.Filter):
 
 def setup_logging_and_tracing(
     log_level: int = logging.INFO,
+    *,
     is_prod: bool = IS_PROD,
 ) -> None:
     """

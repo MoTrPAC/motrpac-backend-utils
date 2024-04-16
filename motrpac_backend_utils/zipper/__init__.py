@@ -5,6 +5,7 @@ completion.
 
 When using this, make sure that package feature "zipper" is used.
 """
+
 #  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 import json
 import logging
@@ -14,7 +15,7 @@ import shutil
 import time
 from concurrent.futures import Future, as_completed
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from multiprocessing import JoinableQueue, Process, Value
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
@@ -67,7 +68,7 @@ def zip_file_writer(
     file_hash: str,
     processed_counter: type[Value] | None,
     file_path_prefix: Path,
-):
+) -> list[str]:
     """
     Writes files to a zip archive.
 
@@ -139,7 +140,7 @@ def patch_zip_blob_metadata(
     """
     bucket = storage_client.get_bucket(output_bucket)
     zip_blob = bucket.blob(os.path.basename(zip_loc))
-    zip_blob.custom_time = datetime.now(timezone.utc)
+    zip_blob.custom_time = datetime.now(UTC)
     zip_blob.patch()
 
 
@@ -165,7 +166,7 @@ def add_to_zip(
     :returns: True when the process has finished (there are no more messages to process/
         the queue has delivered a sentinel boolean value of False)
     """
-    file_hash = os.path.basename(os.path.splitext(zip_loc)[0])
+    file_hash = os.path.basename(os.path.splitext(zip_loc)[0])  # noqa: PTH119, PTH122
     with tracer.start_as_current_span(file_hash):
         logger.debug(
             "[File Hash: %s] Spawned local zip file creator child process, PID: %s",

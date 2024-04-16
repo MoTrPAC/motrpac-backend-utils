@@ -31,8 +31,11 @@ ruff = ">=0.2.1"
 
 [tool.ruff]
 line-length = 90
-select = ["ALL"]
+target-version = "py311"
 exclude = ["*_pb2.py", "*_pb2.pyi"]
+
+[tool.ruff.lint]
+select = ["ALL"]
 ignore = [
     "ANN002",
     "ANN003",
@@ -55,6 +58,9 @@ ignore = [
     "F401",
     "PLR2004"
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"test/*.py" = ["D100", "D101", "D102", "D103", "S101"]
 
 [tool.poetry.extras]
 zipper = ["google-cloud-storage", "psutil", "smart-open", "google-cloud-pubsub", "protobuf"]

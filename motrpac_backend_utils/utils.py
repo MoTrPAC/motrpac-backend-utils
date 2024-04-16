@@ -11,7 +11,7 @@ from google.auth.compute_engine import IDTokenCredentials
 from google.auth.transport.requests import AuthorizedSession, Request
 
 
-def get_env(key: str, default: str = None) -> str:
+def get_env(key: str, default: str | None = None) -> str:
     """
     Gets an environment variable, or either returns a default value or throws an error
     if it is not set.

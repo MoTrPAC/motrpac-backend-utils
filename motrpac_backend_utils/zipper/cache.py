@@ -87,7 +87,7 @@ class InProgressCache:
         :param file_hash: The file to add
         :param requester: The requester of the file
         """
-        if file_hash not in self.cache.keys():
+        if file_hash not in self.cache:
             self.cache[file_hash] = RequesterSet(requester)
         else:
             self.cache[file_hash].add_requester(requester)
