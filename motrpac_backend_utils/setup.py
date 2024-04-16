@@ -19,8 +19,58 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 IS_PROD = bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0")))
 
 
+def get_hexadecimal_trace_id(trace_id: int) -> str:
+    """
+    Get the hexadecimal representation of the trace id.
+
+    :param trace_id: The trace id to convert
+    :return: The trace id in hexadecimal format
+    """
+    return format(trace_id, "032x")
+
+
+def get_hexadecimal_span_id(span_id: int) -> str:
+    """
+    Get the hexadecimal representation of the span id.
+
+    :param span_id: The span id to convert
+    :return: The span id in hexadecimal format
+    """
+    return format(span_id, "016x")
+
+
+class TraceIdInjectionFilter(logging.Filter):
+    """
+    Outputs JSON format to Stdout so Google Cloud Logging can consume and link logs to requests
+     and traces.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize handler.
+        """
+        super().__init__()
+
+    def format(self, record: logging.LogRecord) -> bool:
+        """
+        Add OpenTelemetry span and trace info to the log.
+
+        :param record: The log record to format
+        :return: a JSON formatted string
+        """
+        current_span = trace.get_current_span()
+        if current_span:
+            trace_id = current_span.get_span_context().trace_id
+            span_id = current_span.get_span_context().span_id
+            record.trace = get_hexadecimal_trace_id(trace_id)
+            record.span = get_hexadecimal_span_id(span_id)
+
+        return True
+
+
 def setup_logging_and_tracing(
-    log_level: int = logging.INFO, is_prod: bool = IS_PROD,
+    log_level: int = logging.INFO,
+    is_prod: bool = IS_PROD,
 ) -> None:
     """
     Setup local logging/Google Cloud Logging and tracing. It reads an environment
@@ -36,6 +86,7 @@ def setup_logging_and_tracing(
     if is_prod:
         client = LoggingClient()
         handler = client.get_default_handler()
+        handler.filters = [TraceIdInjectionFilter(), *handler.filters]
         setup_logging(handler, log_level=log_level)
         logging.getLogger("requests").setLevel(logging.WARNING)
         logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
