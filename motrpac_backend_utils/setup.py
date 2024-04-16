@@ -16,9 +16,6 @@ from opentelemetry.propagators.cloud_trace_propagator import CloudTraceFormatPro
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from .flask_logger import FlaskCloudTraceIDFilter
-
-
 IS_PROD = bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0")))
 
 
@@ -39,7 +36,6 @@ def setup_logging_and_tracing(
     if is_prod:
         client = LoggingClient()
         handler = client.get_default_handler()
-        handler.addFilter(FlaskCloudTraceIDFilter())
         setup_logging(handler, log_level=log_level)
         logging.getLogger("requests").setLevel(logging.WARNING)
         logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
