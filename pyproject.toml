@@ -4,6 +4,7 @@ version = "0.7.0"
 description = ""
 authors = ["Mihir Samdarshi <msamdars@stanford.edu>"]
 packages = [{ include = "motrpac_backend_utils" }]
+packages = [{ include = "src/motrpac_backend_utils" }]
 license = "Apache-2.0"
 
 [tool.poetry.dependencies]
@@ -60,7 +61,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"test/*.py" = ["D100", "D101", "D102", "D103", "S101"]
+"tests/*.py" = ["D100", "D101", "D102", "D103", "S101"]
 
 [tool.poetry.extras]
 zipper = ["google-cloud-storage", "psutil", "smart-open", "google-cloud-pubsub", "protobuf"]
