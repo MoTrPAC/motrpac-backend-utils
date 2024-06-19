@@ -1,5 +1,19 @@
-.idea/
+# IDE folders
+.idea
+.vscode
+
+# Python bytecode
 __pycache__/
 *.pyc
+
+# Caches
 .mypy_cache/
 .ruff_cache/
+
+# Coverage.py files
+coverage.xml
+.coverage
+
+# Virtual environment
+.venv
+venv

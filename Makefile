@@ -1,7 +1,7 @@
 CWD := $(abspath $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST))))))
 PROTO_DIR = motrpac_backend_utils/proto
 PROTO_PATH = proto
-VENV_PATH := $(shell poetry env info --path)
+VENV_PATH := $(CWD)/.venv/bin
 
 .PHONY: help
 help:
@@ -11,7 +11,7 @@ help:
 
 .PHONY: init
 # Initialize all dependencies
-init: get-poetry venv-init check-requirements
+init: check-requirements venv-init
 
 .PHONY: check-requirements
 # Check if all dependencies are installed
@@ -19,22 +19,19 @@ check-requirements:
 	if ! command -v protoc &> /dev/null; then \
 		echo "Protobuf compiler is not installed. Please install it first."; \
 		ERROR = 1; \
-	fi
+	fi; \
+	if ! command -v uv &> /dev/null; then \
+		echo "\`uv\` is not installed. Please install it before continuing."; \
+		ERROR = 1; \
+  fi; \
 	if [ -n "$(ERROR)" ]; then \
 		exit 1; \
-	fi
-
-.PHONY: get-poetry
-# Install Poetry if it doesn't exist
-get-poetry:
-	if ! command -v poetry &> /dev/null; then \
-    	curl -sSL https://install.python-poetry.org | python3 - ; \
 	fi
 
 .PHONY: venv-init
 # initialize Prototyping
 venv-init:
-	poetry install
+	uv venv && uv pip install -e '.[zipper,messaging,flask,dev,test]'
 
 .PHONY: protobuf-init
 # generate protobuf files from the proto files
