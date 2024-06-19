@@ -1,6 +1,6 @@
 [project]
 name = "motrpac-backend-utils"
-version = "0.7.0"
+version = "0.7.1"
 description = "Common utilities for MoTrPAC services"
 authors = [{ name = "Mihir Samdarshi", email = "msamdars@stanford.edu" }]
 packages = [{ include = "src/motrpac_backend_utils" }]
