@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2024-06-19
+
+### Refactor
+
+- Move to `src`-layout, change test directory to `tests/`
+
+### Build
+
+- Replace poetry with uv and hatch
+
 ## [0.7.0] - 2024-04-16
 
 ### Features
@@ -349,4 +359,5 @@ All notable changes to this project will be documented in this file.
 - Continue consolidating common code to a private package
 - Move .gitignore
 - Move packages to top-level
+
 
