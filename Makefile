@@ -3,6 +3,9 @@ PROTO_DIR = motrpac_backend_utils/proto
 PROTO_PATH = proto
 VENV_PATH := $(CWD)/.venv/bin
 
+IS_DARWIN := $(shell uname -s | grep Darwin)
+SED_CMD = $(if $(IS_DARWIN),sed -i '', sed -i)
+
 .PHONY: help
 help:
 	@# Magic line used to create self-documenting makefiles.
@@ -38,22 +41,40 @@ venv-init:
 protobuf-init:
 	protoc --proto_path=$(CWD)/$(PROTO_PATH) --python_out=$(CWD)/$(PROTO_DIR) --pyi_out=$(CWD)/$(PROTO_DIR) file_download.proto notification.proto
 
-# Define a function for common steps in version bumping
 define bump_version
-	poetry version $(1) ; \
-	VERSION=$$(poetry version | sed "s/motrpac-backend-utils[[:space:]]//g") ; \
+	CURRENT_VERSION=$$(head pyproject.toml | grep '^version =' pyproject.toml | sed 's/version = //g' | tr -d '"'); \
+	IFS='.' read -r -a VERSION_PARTS <<< "$$CURRENT_VERSION" ; \
+	if [ "$(1)" = "major" ]; then \
+	  VERSION_PARTS[0]=$$((VERSION_PARTS[0] + 1)) ; \
+	  VERSION_PARTS[1]=0 ; \
+	  VERSION_PARTS[2]=0 ; \
+	elif [ "$(1)" = "minor" ] ; then \
+	  VERSION_PARTS[1]=$$((VERSION_PARTS[1] + 1)) ; \
+	  VERSION_PARTS[2]=0 ; \
+	elif [ "$(1)" = "patch" ] ; then \
+	  VERSION_PARTS[2]=$$((VERSION_PARTS[2] + 1)) ; \
+	fi ; \
+	NEW_VERSION=$${VERSION_PARTS[0]}.$${VERSION_PARTS[1]}.$${VERSION_PARTS[2]} ; \
+	echo "✅  $(1) release: bumping version to $$NEW_VERSION" ; \
+	$(SED_CMD) "s/^version = \".*\"/version = \"$$NEW_VERSION\"/" pyproject.toml ;
+endef
+
+define release_version
+	NEW_VERSION=$$(head pyproject.toml | grep '^version =' pyproject.toml | sed 's/version = //g' | tr -d '"'); \
 	git add pyproject.toml ; \
-	git commit -m "chore(release): bump version to $$VERSION" ; \
-	git tag -a v$$VERSION -m "chore(release: bump version to $$VERSION)" ; \
+	git commit -m "chore(release): bump version to $$NEW_VERSION" ; \
+	git tag -a v$$NEW_VERSION -m "chore(release: bump version to $$NEW_VERSION)" ; \
 	git cliff > CHANGELOG.md ; \
 	git add CHANGELOG.md ; \
-	git commit -m "chore(release): update CHANGELOG.md"
+	git commit -m "chore(release): update CHANGELOG.md" ;
 endef
 
 # Use the function for patch and minor version bumping targets
 
 version-patch:
 	$(call bump_version,patch)
+	$(call release_version)
 
 version-minor:
 	$(call bump_version,minor)
+	$(call release_version)
