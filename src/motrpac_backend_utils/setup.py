@@ -69,15 +69,18 @@ class TraceIdInjectionFilter(logging.Filter):
 
 
 def setup_logging_and_tracing(
-    log_level: int = logging.INFO,
-    *,
-    is_prod: bool = IS_PROD,
+        log_level: int = logging.INFO,
+        *,
+        is_prod: bool = IS_PROD,
 ) -> None:
     """
     Setup local logging/Google Cloud Logging and tracing. It reads an environment
     variable called `PRODUCTION_DEPLOYMENT` to determine whether to send logs and
     traces to the Google Cloud Logging and Google Cloud Tracing services. This can be
-    a boolean value, or a string that can be 0 or 1.
+    a boolean value, or a string that can be 0 or 1. Do not use when running Google
+    Cloud's Functions Framework, since that sets up its own logging, resulting in duplicate
+    logs. Instead, in production, use the `LOG_EXECUTION_ID` environment variable to
+    set the execution id for the function, and use `setup_tracing()` to set up tracing.
 
     :param log_level: The log level to use. Defaults to logging.INFO
     :param is_prod: Whether to set up logging and tracing for production. Defaults to
@@ -101,6 +104,22 @@ def setup_logging_and_tracing(
         )
 
     # setup tracing/Google Cloud Tracing if we are in production
+    tracer_provider = TracerProvider()
+    trace.set_tracer_provider(tracer_provider)
+    RequestsInstrumentor().instrument()
+    URLLib3Instrumentor().instrument()
+    if is_prod:
+        trace_exporter = CloudTraceSpanExporter()
+        trace.get_tracer_provider().add_span_processor(
+            BatchSpanProcessor(trace_exporter),
+        )
+        set_global_textmap(CloudTraceFormatPropagator())
+
+
+def setup_tracing(*, is_prod: bool = IS_PROD) -> None:
+    """
+    Set up only tracing for the application.
+    """
     tracer_provider = TracerProvider()
     trace.set_tracer_provider(tracer_provider)
     RequestsInstrumentor().instrument()
