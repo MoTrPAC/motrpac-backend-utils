@@ -13,6 +13,7 @@ dependencies = [
     "opentelemetry-api",
     "opentelemetry-exporter-gcp-trace",
     "opentelemetry-instrumentation-requests",
+    "opentelemetry-instrumentation-threading",
     "opentelemetry-instrumentation-urllib3",
     "opentelemetry-propagator-gcp",
     "opentelemetry-sdk",
@@ -29,6 +30,8 @@ zipper = [
 ]
 messaging = ["google-cloud-pubsub", "protobuf~=4.21"]
 flask = ["flask"]
+
+[dependency-groups]
 dev = ["ruff", "isort"]
 test = ["pytest~=8.2.2", "pytest-mock~=3.14",  "pytest-cov~=5.0"]
 
@@ -51,11 +54,6 @@ minversion = "6.0"
 addopts = [
     "-ra", "--full-trace",
     "--import-mode=importlib",
-    "--cov=src/motrpac_backend_utils",
-    "--cov-branch",
-    "--cov-report=xml",
-    "--cov-report=term-missing",
-
 ]
 testpaths = ["tests"]
 pythonpath = ["src"]

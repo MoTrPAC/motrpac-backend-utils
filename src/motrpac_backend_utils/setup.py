@@ -10,6 +10,7 @@ from google.cloud.logging_v2.handlers import setup_logging
 from opentelemetry import trace
 from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.instrumentation.threading import ThreadingInstrumentor
 from opentelemetry.instrumentation.urllib3 import URLLib3Instrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.cloud_trace_propagator import CloudTraceFormatPropagator
@@ -108,6 +109,7 @@ def setup_logging_and_tracing(
     trace.set_tracer_provider(tracer_provider)
     RequestsInstrumentor().instrument()
     URLLib3Instrumentor().instrument()
+    ThreadingInstrumentor().instrument()
     if is_prod:
         trace_exporter = CloudTraceSpanExporter()
         trace.get_tracer_provider().add_span_processor(
