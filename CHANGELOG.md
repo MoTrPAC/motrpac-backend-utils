@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2025-10-19
+
+### Bug Fixes
+
+- Update type handling, format code
+
+### Features
+
+- Integrate ThreadingInstrumentor into tracing setup
+- Enhance logging setup with TraceIdInjectionFilter
+
+### Miscellaneous Tasks
+
+- Update dependencies and Python version constraints in pyproject.toml and uv.lock
+- Update .gitignore
+- Update release workflow to sync dependencies and include uv.lock
+
+### Refactor
+
+- Update test files for consistency and modernize syntax
+
 ## [0.8.0] - 2025-03-16
 
 ### Features
