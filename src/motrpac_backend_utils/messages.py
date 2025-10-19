@@ -3,6 +3,7 @@
 Contains the messaging functions for the backend. When using this,
 make sure that package features "messaging" or "zipper" are used.
 """
+
 import json
 import logging
 
@@ -77,7 +78,8 @@ def publish_file_download_message(
 
         # Create a new span and yield it
         with tracer.start_as_current_span(
-            f"{topic_id} publisher", attributes={"data": str(msg_data)},
+            f"{topic_id} publisher",
+            attributes={"data": str(msg_data)},
         ) as span:
             try:
                 attrs = {

@@ -4,9 +4,7 @@ Contains the Requester helper class. When using this, make sure that
 package features "messaging" or "zipper" are used.
 """
 
-from typing import NamedTuple, TypeVar, Any
-
-from google.protobuf.message import Message
+from typing import NamedTuple, TypeVar, Self
 
 from .proto import FileDownloadMessage, UserNotificationMessage
 
@@ -14,8 +12,8 @@ from .proto import FileDownloadMessage, UserNotificationMessage
 T = TypeVar("T", bound="Requester")
 U = TypeVar(
     "U",
-    type[UserNotificationMessage.Requester],
-    type[FileDownloadMessage.Requester],
+    UserNotificationMessage.Requester,
+    FileDownloadMessage.Requester,
 )
 
 
@@ -28,17 +26,14 @@ class Requester(NamedTuple):
     email: str
     id: str | None
 
-    def to_proto(self, parent_cls: U) -> Message:
+    def to_proto(self, parent_cls: type[U]) -> U:
         """
         Converts this Requester object to a protobuf object.
         """
         return parent_cls(name=self.name, email=self.email, id=self.id)
 
     @classmethod
-    def from_proto(
-        cls: type[T],
-        proto: UserNotificationMessage.Requester | FileDownloadMessage.Requester,
-    ) -> T:
+    def from_proto(cls, proto: U) -> Self:
         """
         Converts a protobuf object to this Requester object.
         """
@@ -63,4 +58,6 @@ class Requester(NamedTuple):
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, type(self)):
             raise NotImplementedError
-        return self.name == other.name and self.email == other.email and self.id == other.id
+        return (
+            self.name == other.name and self.email == other.email and self.id == other.id
+        )

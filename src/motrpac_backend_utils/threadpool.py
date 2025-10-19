@@ -2,6 +2,7 @@
 """
 Threadpool utility functions.
 """
+
 from concurrent.futures import Future, ThreadPoolExecutor
 from functools import wraps
 from typing import TypeVar, ParamSpec
