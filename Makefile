@@ -56,12 +56,13 @@ define bump_version
 	fi ; \
 	NEW_VERSION=$${VERSION_PARTS[0]}.$${VERSION_PARTS[1]}.$${VERSION_PARTS[2]} ; \
 	echo "✅  $(1) release: bumping version to $$NEW_VERSION" ; \
-	$(SED_CMD) "s/^version = \".*\"/version = \"$$NEW_VERSION\"/" pyproject.toml ;
+	$(SED_CMD) "s/^version = \".*\"/version = \"$$NEW_VERSION\"/" pyproject.toml ; \
+	uv sync --all-groups --all-extras ;
 endef
 
 define release_version
 	NEW_VERSION=$$(head pyproject.toml | grep '^version =' pyproject.toml | sed 's/version = //g' | tr -d '"'); \
-	git add pyproject.toml ; \
+	git add pyproject.toml uv.lock ; \
 	git commit -m "chore(release): bump version to $$NEW_VERSION" ; \
 	git tag -a v$$NEW_VERSION -m "chore(release: bump version to $$NEW_VERSION)" ; \
 	git cliff > CHANGELOG.md ; \
