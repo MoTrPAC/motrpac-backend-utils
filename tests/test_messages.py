@@ -1,19 +1,13 @@
-#  Copyright (c) 2023. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+from __future__ import annotations
 
-import unittest
-from unittest import mock
-from unittest.mock import MagicMock
+import json
+from typing import Any, TYPE_CHECKING
 
 import pytest
 from google.api_core.exceptions import GoogleAPICallError
-from google.cloud.pubsub_v1 import PublisherClient
-from google.cloud.pubsub_v1.publisher.futures import Future
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import (
-    BatchSpanProcessor,
-    ConsoleSpanExporter,
-)
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
 from motrpac_backend_utils.messages import (
     publish_file_download_message,
@@ -22,106 +16,121 @@ from motrpac_backend_utils.messages import (
 from motrpac_backend_utils.proto import FileDownloadMessage
 from motrpac_backend_utils.requester import Requester
 
-tracer_provider = TracerProvider()
-trace.set_tracer_provider(tracer_provider)
-
-trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
-tracer = trace.get_tracer(__name__)
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
-class TestDecodeFileDownloadMessage(unittest.TestCase):
-    def test_decode_file_download_message(self) -> None:
-        # Arrange
-        files = ["file1.txt", "file2.txt"]
-        name = "John Doe"
-        user_id = "1234567890"
-        email = "johndoe@example.com"
-        message = FileDownloadMessage()
-        message.files.extend(files)
-        message.requester.CopyFrom(
-            Requester(name=name, email=email, id=user_id).to_proto(
-                FileDownloadMessage.Requester,
-            ),
+@pytest.fixture(autouse=True)
+def _setup_tracer() -> None:
+    tracer_provider = TracerProvider()
+    trace.set_tracer_provider(tracer_provider)
+    trace.get_tracer_provider().add_span_processor(
+        BatchSpanProcessor(ConsoleSpanExporter()),
+    )
+
+
+@pytest.fixture
+def sample_request() -> dict[str, Any]:
+    return {
+        "name": "John Doe",
+        "user_id": "1234567890",
+        "email": "johndoe@example.com",
+        "files": ["file1.txt", "file2.txt"],
+        "topic_id": "my-topic",
+    }
+
+
+@pytest.mark.parametrize(
+    "files",
+    [["file1.txt"], ["file1.txt", "file2.txt", "file3.txt"]],
+)
+def test_decode_file_download_message(files: list[str]) -> None:
+    # Arrange
+    name = "John Doe"
+    user_id = "1234567890"
+    email = "johndoe@example.com"
+    message = FileDownloadMessage()
+    message.files.extend(files)
+    message.requester.CopyFrom(
+        Requester(name=name, email=email, id=user_id).to_proto(
+            FileDownloadMessage.Requester,
+        ),
+    )
+    encoded_message = message.SerializeToString()
+
+    # Act
+    decoded_files, requester = decode_file_download_message(encoded_message)
+
+    # Assert
+    assert decoded_files == files
+    assert requester.name == name
+    assert requester.email == email
+
+
+def test_decode_file_download_message_invalid_message() -> None:
+    # Arrange
+    invalid_message = b"invalid_message"
+
+    # Act & Assert
+    with pytest.raises(ValueError, match="Failed to decode"):
+        decode_file_download_message(invalid_message)
+
+
+@pytest.fixture
+def mock_pubsub(mocker: MockerFixture) -> tuple[Any, Any]:
+    mock_client = mocker.MagicMock()
+    mock_future = mocker.MagicMock()
+    mock_client.publish.return_value = mock_future
+    # Ensure future.result returns something stringifiable
+    mock_future.result.return_value = "123"
+    return mock_client, mock_future
+
+
+def test_publish_file_download_message_success(
+    sample_request: dict[str, Any],
+    mock_pubsub: tuple[Any, Any],
+) -> None:
+    client, future = mock_pubsub
+    tracer = trace.get_tracer(__name__)
+
+    with tracer.start_as_current_span(
+        "test_publish_file_download_message_success",
+    ) as span:
+        span.set_attribute("printed_string", "hello")
+        publish_file_download_message(
+            sample_request["name"],
+            sample_request["user_id"],
+            sample_request["email"],
+            sample_request["files"],
+            sample_request["topic_id"],
+            client,
         )
-        encoded_message = message.SerializeToString()
 
-        # Act
-        decoded_files, requester = decode_file_download_message(encoded_message)
-
-        # Assert
-        assert decoded_files == files
-        assert requester.name == name
-        assert requester.email == email
-
-    def test_decode_file_download_message_invalid_message(self) -> None:
-        # Arrange
-        invalid_message = b"invalid_message"
-
-        # Act & Assert
-        with pytest.raises(ValueError):
-            decode_file_download_message(invalid_message)
+    # Assert
+    # The second positional arg is the encoded bytes; the attrs include span context json
+    called_args, called_kwargs = client.publish.call_args
+    assert called_args[0] == sample_request["topic_id"]
+    assert isinstance(called_args[1], (bytes, bytearray))
+    assert "googclient_OpenTelemetrySpanContext" in called_kwargs
+    # Validate the value is JSON
+    json.loads(called_kwargs["googclient_OpenTelemetrySpanContext"])  # no raise
+    future.result.assert_called_once()
 
 
-class TestPublishFileDownloadMessage(unittest.TestCase):
-    def setUp(self) -> None:
-        self.mock_client = MagicMock(spec=PublisherClient)
-        self.mock_future = MagicMock(spec=Future)
-        self.mock_client.publish.return_value = self.mock_future
+def test_publish_file_download_message_failure(
+    sample_request: dict[str, Any],
+    mock_pubsub: tuple[Any, Any],
+) -> None:
+    client, _ = mock_pubsub
+    error = GoogleAPICallError("Error occurred.")
+    client.publish.side_effect = error
 
-    def test_publish_file_download_message_success(self) -> None:
-        # Arrange
-        name = "John Doe"
-        user_id = "1234567890"
-        email = "johndoe@example.com"
-        files = ["file1.txt", "file2.txt"]
-        topic_id = "my-topic"
-
-        with tracer.start_as_current_span(
-            "test_publish_file_download_message_success",
-        ) as span:
-            span.set_attribute("printed_string", "hello")
-            publish_file_download_message(
-                name,
-                user_id,
-                email,
-                files,
-                topic_id,
-                self.mock_client,
-            )
-
-        # Assert
-        self.mock_client.publish.assert_called_once_with(
-            topic_id,
-            mock.ANY,
-            googclient_OpenTelemetrySpanContext=mock.ANY,
+    with pytest.raises(GoogleAPICallError):
+        publish_file_download_message(
+            sample_request["name"],
+            sample_request["user_id"],
+            sample_request["email"],
+            sample_request["files"],
+            sample_request["topic_id"],
+            client,
         )
-        self.mock_future.result.assert_called_once()
-
-    def test_publish_file_download_message_failure(self) -> None:
-        # Arrange
-        name = "John Doe"
-        user_id = "1234567890"
-        email = "johndoe@example.com"
-        files = ["file1.txt", "file2.txt"]
-        topic_id = "my-topic"
-        error = GoogleAPICallError("Error occurred.")
-
-        self.mock_client.publish.side_effect = error
-
-        # Act & Assert
-        with pytest.raises(GoogleAPICallError), tracer.start_as_current_span(  # noqa: PT012
-            "test_publish_file_download_message_failure",
-        ) as span:
-            span.set_attribute("printed_string", "hello")
-            publish_file_download_message(
-                name,
-                user_id,
-                email,
-                files,
-                topic_id,
-                self.mock_client,
-            )
-
-
-if __name__ == "__main__":
-    unittest.main()

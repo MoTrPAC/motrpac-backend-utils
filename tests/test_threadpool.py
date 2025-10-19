@@ -1,7 +1,4 @@
-#  Copyright (c) 2023. Mihir Samdarshi/MoTrPAC Bioinformatics Center
-
-import unittest
-from concurrent.futures import ThreadPoolExecutor
+import pytest
 
 from motrpac_backend_utils.threadpool import threadpool
 
@@ -12,25 +9,14 @@ def square(x: int) -> int:
     return x**2
 
 
-class TestThreadpoolDecorator(unittest.TestCase):
-    def test_threadpool_decorator(self) -> None:
-        # Test using the default thread pool
-        squared_num = square(5)
-        assert squared_num.result() == 25
-
-        # Test using a custom thread pool
-        custom_pool = ThreadPoolExecutor(max_workers=2)
-
-        @threadpool
-        def re_square(x: int) -> int:
-            return x**2
-
-        squared_num = re_square(3)
-        assert squared_num.result() == 9
-
-        # Clean up the custom thread pool
-        custom_pool.shutdown()
+def test_threadpool_decorator_default_pool() -> None:
+    # Test using the default thread pool
+    future = square(5)
+    assert future.result() == 25
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.parametrize(("val", "expected"), [(0, 0), (1, 1), (3, 9), (10, 100)])
+def test_threadpool_decorator_parametrized(val: int, expected: int) -> None:
+    # Ensure the decorator returns a future whose result matches
+    future = square(val)
+    assert future.result() == expected
