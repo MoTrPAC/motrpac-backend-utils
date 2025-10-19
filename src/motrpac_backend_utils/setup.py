@@ -2,6 +2,7 @@
 """
 A utility module for setting up logging and tracing.
 """
+
 import logging
 import os
 
@@ -9,7 +10,7 @@ from google.cloud.logging import Client as LoggingClient
 from google.cloud.logging_v2.handlers import setup_logging
 from opentelemetry import trace
 from opentelemetry.exporter.cloud_trace import CloudTraceSpanExporter
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.threading import ThreadingInstrumentor
 from opentelemetry.instrumentation.urllib3 import URLLib3Instrumentor
 from opentelemetry.propagate import set_global_textmap
@@ -20,59 +21,8 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 IS_PROD = bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0")))
 
 
-def get_hexadecimal_trace_id(trace_id: int) -> str:
-    """
-    Get the hexadecimal representation of the trace id.
-
-    :param trace_id: The trace id to convert
-    :return: The trace id in hexadecimal format
-    """
-    return format(trace_id, "032x")
-
-
-def get_hexadecimal_span_id(span_id: int) -> str:
-    """
-    Get the hexadecimal representation of the span id.
-
-    :param span_id: The span id to convert
-    :return: The span id in hexadecimal format
-    """
-    return format(span_id, "016x")
-
-
-class TraceIdInjectionFilter(logging.Filter):
-    """
-    Outputs JSON format to Stdout so Google Cloud Logging can consume and link logs to requests
-     and traces.
-    """
-
-    def __init__(self) -> None:
-        """
-        Initialize handler.
-        """
-        super().__init__()
-
-    def format(self, record: logging.LogRecord) -> bool:
-        """
-        Add OpenTelemetry span and trace info to the log.
-
-        :param record: The log record to format
-        :return: a JSON formatted string
-        """
-        current_span = trace.get_current_span()
-        if current_span:
-            trace_id = current_span.get_span_context().trace_id
-            span_id = current_span.get_span_context().span_id
-            record.trace = get_hexadecimal_trace_id(trace_id)
-            record.span = get_hexadecimal_span_id(span_id)
-
-        return True
-
-
 def setup_logging_and_tracing(
-        log_level: int = logging.INFO,
-        *,
-        is_prod: bool = IS_PROD,
+    log_level: int = logging.INFO, *, is_prod: bool = IS_PROD
 ) -> None:
     """
     Setup local logging/Google Cloud Logging and tracing. It reads an environment
@@ -88,34 +38,25 @@ def setup_logging_and_tracing(
         the value of the `PRODUCTION_DEPLOYMENT` environment variable, which defaults
         to False if not set to "1".
     """
+    # setup tracing/Google Cloud Tracing if we are in production
+    setup_tracing(is_prod=is_prod)
+
     if is_prod:
         client = LoggingClient()
         handler = client.get_default_handler()
-        handler.filters = [TraceIdInjectionFilter(), *handler.filters]
         setup_logging(handler, log_level=log_level)
         logging.getLogger("requests").setLevel(logging.WARNING)
         logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
         logging.getLogger("urllib3.util.retry").setLevel(logging.WARNING)
     else:
-        log_format = "%(levelname)s %(asctime)s %(name)s:%(funcName)s:%(lineno)s %(message)s"
+        log_format = (
+            "%(levelname)s %(asctime)s %(name)s:%(funcName)s:%(lineno)s %(message)s"
+        )
         logging.basicConfig(
             format=log_format,
             datefmt="%I:%M:%S %p",
             level=log_level,
         )
-
-    # setup tracing/Google Cloud Tracing if we are in production
-    tracer_provider = TracerProvider()
-    trace.set_tracer_provider(tracer_provider)
-    RequestsInstrumentor().instrument()
-    URLLib3Instrumentor().instrument()
-    ThreadingInstrumentor().instrument()
-    if is_prod:
-        trace_exporter = CloudTraceSpanExporter()
-        trace.get_tracer_provider().add_span_processor(
-            BatchSpanProcessor(trace_exporter),
-        )
-        set_global_textmap(CloudTraceFormatPropagator())
 
 
 def setup_tracing(*, is_prod: bool = IS_PROD) -> None:
@@ -124,8 +65,9 @@ def setup_tracing(*, is_prod: bool = IS_PROD) -> None:
     """
     tracer_provider = TracerProvider()
     trace.set_tracer_provider(tracer_provider)
-    RequestsInstrumentor().instrument()
     URLLib3Instrumentor().instrument()
+    ThreadingInstrumentor().instrument()
+    LoggingInstrumentor().instrument(set_logging_format=is_prod)
     if is_prod:
         trace_exporter = CloudTraceSpanExporter()
         trace.get_tracer_provider().add_span_processor(
