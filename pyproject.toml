@@ -3,16 +3,15 @@ name = "motrpac-backend-utils"
 version = "0.8.0"
 description = "Common utilities for MoTrPAC services"
 authors = [{ name = "Mihir Samdarshi", email = "msamdars@stanford.edu" }]
-packages = [{ include = "src/motrpac_backend_utils" }]
 license = "Apache-2.0"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 
 dependencies = [
     "google-auth",
     "google-cloud-logging",
     "opentelemetry-api",
     "opentelemetry-exporter-gcp-trace",
-    "opentelemetry-instrumentation-requests",
+    "opentelemetry-instrumentation-logging",
     "opentelemetry-instrumentation-threading",
     "opentelemetry-instrumentation-urllib3",
     "opentelemetry-propagator-gcp",
@@ -68,8 +67,6 @@ select = ["ALL"]
 ignore = [
     "ANN002",
     "ANN003",
-    "ANN101",
-    "ANN102",
     "ANN401",
     "BLE001",
     "D104",
@@ -89,4 +86,4 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*.py" = ["D100", "D101", "D102", "D103", "S101"]
+"tests/*.py" = ["D100", "D101", "D102", "D103", "S101", "S108", "SLF001"]
