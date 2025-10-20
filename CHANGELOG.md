@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.1] - 2025-10-20
+
+### Bug Fixes
+
+- Add minimum requirement for opentelemetry-exporter-gcp-trace
+
 ## [0.9.0] - 2025-10-19
 
 ### Bug Fixes
