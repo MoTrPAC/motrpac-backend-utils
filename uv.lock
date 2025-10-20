@@ -603,7 +603,7 @@ requires-dist = [
     { name = "google-cloud-pubsub", marker = "extra == 'zipper'" },
     { name = "google-cloud-storage", marker = "extra == 'zipper'" },
     { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-gcp-trace" },
+    { name = "opentelemetry-exporter-gcp-trace", specifier = ">=1.7.0" },
     { name = "opentelemetry-instrumentation-logging" },
     { name = "opentelemetry-instrumentation-threading" },
     { name = "opentelemetry-instrumentation-urllib3" },
