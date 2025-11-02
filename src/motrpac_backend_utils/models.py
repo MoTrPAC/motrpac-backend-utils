@@ -12,7 +12,6 @@ class DownloadRequestFileModel(BaseModel):
 
     object: str
     object_size: int
-    key: str
 
 
 def sort_files(files: list[DownloadRequestFileModel]) -> list[DownloadRequestFileModel]:
