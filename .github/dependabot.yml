@@ -1,0 +1,68 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Monitor Python dependencies using uv
+  - package-ecosystem: uv
+    directory: "/"
+    schedule:
+      interval: monthly
+    target-branch: develop
+    groups:
+      # Google Cloud dependencies
+      google:
+        patterns:
+          - "google*"
+      # Telemetry and monitoring
+      monitoring:
+        patterns:
+          - "opentelemetry*"
+      # Web framework dependencies
+      framework:
+        patterns:
+          - "flask*"
+          - "functions-framework*"
+          - "granian"
+      # Protobuf dependencies
+      protobuf:
+        patterns:
+          - "protobuf*"
+      # Storage and filesystem dependencies
+      storage:
+        patterns:
+          - "google-cloud-storage"
+          - "psutil"
+          - "smart-open"
+          - "fsspec*"
+          - "gcsfs*"
+      # Development and testing tools
+      tools:
+        patterns:
+          - "ruff*"
+          - "isort*"
+          - "black*"
+          - "pytest*"
+          - "coverage*"
+          - "pytest-*"
+      # Utility libraries
+      utilities:
+        patterns:
+          - "typing-extensions"
+    commit-message:
+      prefix: "chore(deps): "
+
+  # Monitor GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(ci): "
+    groups:
+      actions:
+        patterns:
+          - "*"
