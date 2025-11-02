@@ -42,8 +42,6 @@ updates:
       tools:
         patterns:
           - "ruff*"
-          - "isort*"
-          - "black*"
           - "pytest*"
           - "coverage*"
           - "pytest-*"
