@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.2] - 2025-11-02
+
+### Bug Fixes
+
+- Remove key from DownloadRequestFileModel
+
+### Miscellaneous Tasks
+
+- Remove outdated REPOSITORY.md file
+- Add Dependabot configuration for dependency and CI updates
+- Add CI workflow for testing on develop, fix/*, and feat/* branches
+- Add test target to Makefile
+- Add main branch to CI target
+
 ## [0.9.1] - 2025-10-20
 
 ### Bug Fixes
