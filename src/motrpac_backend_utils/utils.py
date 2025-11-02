@@ -6,7 +6,7 @@ Utility functions for the MoTrPAC backend utility function package. Recursive ut
 import os
 from hashlib import md5
 
-import google.auth
+from google.oauth2 import id_token
 from google.auth.compute_engine import IDTokenCredentials
 from google.auth.transport.requests import AuthorizedSession, Request
 
@@ -42,11 +42,9 @@ def get_authorized_session(
     credentials
     :return: An AuthorizedSession instance to use to make requests to Google services
     """
-    if bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0"))):
-        request = Request()
-        credentials = IDTokenCredentials(request=request, target_audience=audience)
-    else:
-        credentials, _ = google.auth.default()
+    request = Request()
+    credentials = id_token.fetch_id_token_credentials(audience, request)
+    credentials.refresh(request)
 
     return AuthorizedSession(credentials, max_refresh_attempts=max_refresh_attempts)
 

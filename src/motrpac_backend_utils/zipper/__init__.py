@@ -303,7 +303,7 @@ class ZipUploader:
         self.notification_url = notification_url
 
         # the file's requesters
-        self.requesters = requesters
+        self.requesters = requesters or []
         self.in_progress_cache = in_progress_cache
         if self.in_progress_cache is None and self.requesters is None:
             msg = "Either in_progress_cache or requesters must be specified"
