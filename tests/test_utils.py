@@ -63,53 +63,63 @@ def test_generate_file_hash(files: list[str]) -> None:
     assert md5_hash == expected
 
 
-def test_get_authorized_session_non_production(
+def test_get_authorized_session(
     mocker: MockFixture,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # PRODUCTION_DEPLOYMENT not set or 0
-    monkeypatch.setenv("PRODUCTION_DEPLOYMENT", "0")
+    # Mock the Request object
+    mock_request = mocker.patch("motrpac_backend_utils.utils.Request")
+    mock_request_instance = mock_request.return_value
 
-    fake_creds = object()
-    mock_default = mocker.patch(
-        "motrpac_backend_utils.utils.google.auth.default",
-        return_value=(fake_creds, "proj"),
+    # Mock the credentials returned by fetch_id_token_credentials
+    fake_creds = mocker.MagicMock()
+    mock_fetch_credentials = mocker.patch(
+        "motrpac_backend_utils.utils.id_token.fetch_id_token_credentials",
+        return_value=fake_creds,
     )
+
+    # Mock AuthorizedSession
     mock_authorized_session = mocker.patch(
         "motrpac_backend_utils.utils.AuthorizedSession",
     )
 
-    session = get_authorized_session("https://service")
+    audience = "https://service.example.com"
+    session = get_authorized_session(audience)
 
-    mock_default.assert_called_once()
+    # Verify Request was instantiated
+    mock_request.assert_called_once()
+
+    # Verify fetch_id_token_credentials was called with the audience and request
+    mock_fetch_credentials.assert_called_once_with(audience, mock_request_instance)
+
+    # Verify credentials.refresh was called
+    fake_creds.refresh.assert_called_once_with(mock_request_instance)
+
+    # Verify AuthorizedSession was created with the credentials
     mock_authorized_session.assert_called_once_with(fake_creds, max_refresh_attempts=100)
+
+    # Verify the session is returned
     assert session == mock_authorized_session.return_value
 
 
-def test_get_authorized_session_production(
+def test_get_authorized_session_custom_refresh_attempts(
     mocker: MockFixture,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # PRODUCTION_DEPLOYMENT=1 triggers ID token path
-    monkeypatch.setenv("PRODUCTION_DEPLOYMENT", "1")
-
+    # Test with custom max_refresh_attempts parameter
     mock_request = mocker.patch("motrpac_backend_utils.utils.Request")
-    mock_id_token_credentials = mocker.patch(
-        "motrpac_backend_utils.utils.IDTokenCredentials",
+    mock_request_instance = mock_request.return_value
+
+    fake_creds = mocker.MagicMock()
+    mocker.patch(
+        "motrpac_backend_utils.utils.id_token.fetch_id_token_credentials",
+        return_value=fake_creds,
     )
+
     mock_authorized_session = mocker.patch(
         "motrpac_backend_utils.utils.AuthorizedSession",
     )
 
-    session = get_authorized_session("https://service")
+    session = get_authorized_session("https://service", max_refresh_attempts=50)
 
-    mock_request.assert_called_once()
-    mock_id_token_credentials.assert_called_once()
-    _creds_args, creds_kwargs = mock_id_token_credentials.call_args
-    assert "target_audience" in creds_kwargs
-    assert creds_kwargs["target_audience"] == "https://service"
-    mock_authorized_session.assert_called_once_with(
-        mock_id_token_credentials.return_value,
-        max_refresh_attempts=100,
-    )
+    # Verify AuthorizedSession was created with custom max_refresh_attempts
+    mock_authorized_session.assert_called_once_with(fake_creds, max_refresh_attempts=50)
     assert session == mock_authorized_session.return_value
