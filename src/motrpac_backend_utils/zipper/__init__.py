@@ -26,7 +26,7 @@ from google.cloud.pubsub_v1.subscriber.message import Message
 from google.cloud.storage import Client as StorageClient
 from opentelemetry import trace
 from psutil import virtual_memory
-from smart_open import open
+from smart_open import open as _smart_open_fn
 
 from motrpac_backend_utils.messages import send_notification_message
 from motrpac_backend_utils.requester import Requester
@@ -205,7 +205,7 @@ def add_to_zip(
                 manifest_fn = f"{file_hash}.list.manifest.json"
                 archive.writestr(manifest_fn, json.dumps(manifest, indent=2))
 
-            with open(
+            with _smart_open_fn(
                 zip_loc,
                 mode="wb",
                 transport_params={
