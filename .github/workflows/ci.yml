@@ -18,7 +18,7 @@ on:
 
 jobs:
   test:
-    runs-on: linux-self-hosted
+    runs-on: ubuntu-latest
 
     defaults:
       run:
