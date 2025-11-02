@@ -1,0 +1,57 @@
+name: test
+
+on:
+  push:
+    branches:
+      - develop
+      - fix/*
+      - feat/*
+    paths-ignore:
+      - .github/**
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths-ignore:
+      - .github/**
+
+jobs:
+  test:
+    runs-on: linux-self-hosted
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        id: setup-python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install uv on Linux or macOS
+        run: curl -sSfL https://astral.sh/uv/install.sh | bash
+
+      - name: Find uv cache and compute cache suffix
+        run: |
+          {
+            echo "UV_CACHE=$(uv cache dir)"
+            echo "HASH_CACHE_SUFFIX=-${{ hashFiles('**/pyproject.toml') }}"
+          } >> $GITHUB_ENV
+
+      - name: Load uv cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.UV_CACHE }}
+          key: |
+            uv-cache-${{ env.HASH_CACHE_SUFFIX }}
+            uv-cache
+
+      - name: Setup environments
+        run: make init
+
+      - name: Run tests
+        run: make test
