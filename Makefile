@@ -34,7 +34,12 @@ check-requirements:
 .PHONY: venv-init
 # initialize Prototyping
 venv-init:
-	uv venv && uv pip install -e '.[zipper,messaging,flask,dev,test]'
+	uv sync --all-groups --all-extras
+
+.PHONY: test
+# Run tests for the package
+test:
+	uv run pytest
 
 .PHONY: protobuf-init
 # generate protobuf files from the proto files
@@ -71,7 +76,6 @@ define release_version
 endef
 
 # Use the function for patch and minor version bumping targets
-
 version-patch:
 	$(call bump_version,patch)
 	$(call release_version)
