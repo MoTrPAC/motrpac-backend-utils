@@ -1,6 +1,6 @@
 [project]
 name = "motrpac-backend-utils"
-version = "0.9.3"
+version = "0.9.4"
 description = "Common utilities for MoTrPAC services"
 authors = [{ name = "Mihir Samdarshi", email = "msamdars@stanford.edu" }]
 license = "Apache-2.0"
