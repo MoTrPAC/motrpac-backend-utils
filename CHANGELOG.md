@@ -2,20 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.9.4] - 2025-11-02
 
 ### Bug Fixes
 
 - Remove key from DownloadRequestFileModel
 
+### Features
+
+- Update DownloadRequestModel to improve documentation and enhance hash generation method
+
 ### Miscellaneous Tasks
 
+- *(deps)* Bump the google group with 2 updates
+- *(deps)* Bump the monitoring group with 7 updates
+- *(deps)* Bump the storage group with 3 updates
+- *(deps)* Bump the tools group with 4 updates
 - Remove outdated REPOSITORY.md file
 - Add Dependabot configuration for dependency and CI updates
 - Add CI workflow for testing on develop, fix/*, and feat/* branches
 - Add test target to Makefile
 - Add main branch to CI target
 - Do not use self hosted runners for public repo
+- Remove isort from deps
+- Remove black and isort from dependabot config
 
 ### Refactor
 
@@ -168,14 +178,9 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-- [**breaking**] Revert "extracted common Requester class from Message protobufs"
-
-## [0.3.0] - 2023-07-27
-
-### Features
-
 - Add custom BlobNotFoundError class and modify blob handling
 - [**breaking**] Extracted common Requester class from Message protobufs
+- [**breaking**] Revert "extracted common Requester class from Message protobufs"
 
 ### Refactor
 
