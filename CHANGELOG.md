@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.9.2] - 2025-11-02
+## [unreleased]
 
 ### Bug Fixes
 
@@ -15,6 +15,16 @@ All notable changes to this project will be documented in this file.
 - Add CI workflow for testing on develop, fix/*, and feat/* branches
 - Add test target to Makefile
 - Add main branch to CI target
+- Do not use self hosted runners for public repo
+
+### Refactor
+
+- Update ID token fetching in utils.py to use google.oauth2 for improved authentication
+- Rename smart_open to avoid shadowing built-in
+
+### Testing
+
+- Update tests for get_authorized_sessions
 
 ## [0.9.1] - 2025-10-20
 
