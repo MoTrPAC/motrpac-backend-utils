@@ -139,12 +139,12 @@ def patch_zip_blob_metadata(
     :param storage_client: The Google Cloud Storage client.
     """
     bucket = storage_client.get_bucket(output_bucket)
-    zip_blob = bucket.blob(os.path.basename(zip_loc))
+    zip_blob = bucket.blob(os.path.basename(zip_loc))  # noqa PTH119
     zip_blob.custom_time = datetime.now(UTC)
     zip_blob.patch()
 
 
-def add_to_zip(
+def add_to_zip(  # noqa: PLR0913
     tmp_dir: str,
     zip_loc: str,
     output_bucket: str,
@@ -253,7 +253,7 @@ class ZipUploader:
     (also in Google Cloud Storage).
     """
 
-    def __init__(
+    def __init__(    # noqa: PLR0913
         self,
         files: list[str],
         file_hash: str,
@@ -261,8 +261,8 @@ class ZipUploader:
         storage_client: StorageClient | None = None,
         input_bucket: str | None = None,
         output_bucket: str | None = None,
-        scratch_location: Path = Path("/tmp"),
-        file_dl_location: Path = Path("/tmp/file_cache"),
+        scratch_location: Path = Path("/tmp"),  # noqa: S108
+        file_dl_location: Path = Path("/tmp/file_cache"),  # noqa: S108
         in_progress_cache: InProgressCache | None = None,
         requesters: list[Requester] | None = None,
         message: Message | None = None,
@@ -330,7 +330,7 @@ class ZipUploader:
         # the message from the PubSub pull subscription if that is the source of the
         # ZipUploader
         if self.message is not None:
-            deadline = datetime.fromtimestamp(message._received_timestamp)
+            deadline = datetime.fromtimestamp(message._received_timestamp)  # noqa: SLF001
             # set some attributes on the message for our own tracking use
             message.ack_deadline = ack_deadline
             message.ack_start_time = deadline

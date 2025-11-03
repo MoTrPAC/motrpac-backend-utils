@@ -2,14 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
-
 import pytest
-from motrpac_backend_utils.utils import (
-    get_env,
-    generate_file_hash,
-    get_authorized_session,
-)
+from motrpac_backend_utils.utils import get_env, get_authorized_session
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -43,24 +37,6 @@ def test_get_env_missing_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(key, raising=False)
     with pytest.raises(ValueError, match="environment variable is missing"):
         get_env(key)
-
-
-@pytest.mark.parametrize(
-    "files",
-    [
-        [],
-        ["b.txt"],
-        ["b.txt", "a.txt", "c.txt"],
-    ],
-)
-def test_generate_file_hash(files: list[str]) -> None:
-    sorted_files, md5_hash = generate_file_hash(files)
-    assert sorted_files == sorted(files)
-    expected = hashlib.md5(
-        ",".join(sorted(files)).encode("utf-8"),
-        usedforsecurity=False,
-    ).hexdigest()
-    assert md5_hash == expected
 
 
 def test_get_authorized_session(

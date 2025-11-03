@@ -4,72 +4,62 @@ Contains the messaging functions for the backend. When using this,
 make sure that package features "messaging" or "zipper" are used.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 
 from google.api_core.exceptions import GoogleAPICallError
-from google.auth.transport.requests import AuthorizedSession
-from google.cloud.pubsub_v1 import PublisherClient
 from google.protobuf.message import Error
 from opentelemetry import trace
 from opentelemetry.instrumentation.utils import http_status_to_status_code
 from opentelemetry.trace import Status
 
-from .proto import FileDownloadMessage, UserNotificationMessage
-from .requester import Requester
-from .utils import get_authorized_session
+from motrpac_backend_utils.proto import FileDownloadMessage, UserNotificationMessage
+from motrpac_backend_utils.requester import Requester
+from motrpac_backend_utils.utils import get_authorized_session
+from motrpac_backend_utils.models import DownloadRequestModel
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from google.auth.transport.requests import AuthorizedSession
+    from google.cloud.pubsub_v1 import PublisherClient
 
 logger = logging.getLogger(__name__)
 
 
-def decode_file_download_message(message: bytes) -> tuple[list[str], Requester]:
+def decode_file_download_message(message: bytes) -> DownloadRequestModel:
     """
-    Parses a File Download Protobuf message into a List of requested files and a named
-    tuple of type Requester.
+    Parses a File Download Protobuf message into a DownloadRequestModel.
 
     :param message: The Protobuf message (encoded as bytes)
-    :return: The decoded message
+    :return: A DownloadRequestModel instance
     """
     try:
         message_data = FileDownloadMessage()
         message_data.ParseFromString(message)
-        requested_files = list(message_data.files)
-        requester = Requester.from_proto(message_data.requester)
+        return DownloadRequestModel.from_message(message_data)
     except Error as e:
         msg = "Failed to decode protobuf message"
         raise ValueError(msg) from e
 
-    return requested_files, requester
-
 
 def publish_file_download_message(
-    name: str,
-    user_id: str | None,
-    email: str,
-    files: list[str],
+    req: DownloadRequestModel,
     topic_id: str,
     client: PublisherClient,
 ) -> None:
     """
     Publishes a FileDownloadMessage protobuf message to the topic id provided.
 
-    :param name: The name of the requester
-    :param user_id: The ID of the requester
-    :param email: The email of the requester
-    :param files: A list of files that are being downloaded
+    :param req: The DownloadRequestModel containing requester info and files
     :param topic_id: The Pub/Sub topic to publish messages to
     :param client: The Pub/Sub PublisherClient
     :return:
     """
     try:
-        # Instantiate a protoc-generated class defined in `us-states.proto`.
-        message = FileDownloadMessage()
-        message.files.extend(files)
-        message.requester.CopyFrom(
-            Requester(name=name, email=email, id=user_id).to_proto(
-                FileDownloadMessage.Requester,
-            ),
-        )
+        # Convert the DownloadRequestModel to a protobuf message
+        message = req.to_message()
         # Encode the data according to the message serialization type.
         msg_data = message.SerializeToString()
         logger.debug("Preparing a binary-encoded message:\n%s", msg_data)
@@ -100,7 +90,7 @@ def publish_file_download_message(
         raise e from e
 
 
-def send_notification_message(
+def send_notification_message(  # noqa: PLR0913
     name: str,
     user_id: str | None,
     email: str,

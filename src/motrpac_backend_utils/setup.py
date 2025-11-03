@@ -22,7 +22,7 @@ IS_PROD = bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0")))
 
 
 def setup_logging_and_tracing(
-    log_level: int = logging.INFO, *, is_prod: bool = IS_PROD
+    log_level: int = logging.INFO, *, is_prod: bool = IS_PROD,
 ) -> None:
     """
     Setup local logging/Google Cloud Logging and tracing. It reads an environment

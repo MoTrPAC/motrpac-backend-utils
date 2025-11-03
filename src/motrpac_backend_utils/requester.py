@@ -6,7 +6,8 @@ package features "messaging" or "zipper" are used.
 
 from typing import NamedTuple, TypeVar, Self
 
-from .proto import FileDownloadMessage, UserNotificationMessage
+from motrpac_backend_utils.models import DownloadRequestModel
+from motrpac_backend_utils.proto import FileDownloadMessage, UserNotificationMessage
 
 
 T = TypeVar("T", bound="Requester")
@@ -38,6 +39,16 @@ class Requester(NamedTuple):
         Converts a protobuf object to this Requester object.
         """
         return cls(name=proto.name, email=proto.email, id=proto.id)
+
+    @classmethod
+    def from_model(cls, model: DownloadRequestModel) -> Self:
+        """
+        Extract a Requester from a DownloadRequestModel.
+
+        :param model: The DownloadRequestModel instance
+        :return: A Requester instance
+        """
+        return cls(name=model.name, email=model.email, id=model.user_id)
 
     def __repr__(self) -> str:
         """

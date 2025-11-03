@@ -1,11 +1,16 @@
 """API request/response models for the main file download service."""
 
-from enum import StrEnum
-from hashlib import md5
-from typing import Annotated
+from __future__ import annotations
 
-from motrpac_backend_utils.utils import generate_file_hash
+from hashlib import md5
+from typing import Annotated, Self, TypeVar
+
+from motrpac_backend_utils.proto import FileDownloadMessage
+from motrpac_backend_utils.requester import Requester
 from pydantic import AfterValidator, BaseModel, Field, computed_field
+
+# Type variable for protobuf File message types
+ProtoFileType = TypeVar("ProtoFileType")
 
 
 class DownloadRequestFileModel(BaseModel):
@@ -13,6 +18,25 @@ class DownloadRequestFileModel(BaseModel):
 
     object: str
     object_size: int
+
+    @classmethod
+    def from_proto(cls, proto_file: ProtoFileType) -> Self:
+        """
+        Construct a DownloadRequestFileModel from a protobuf File message.
+
+        :param proto_file: The protobuf File message
+        :return: A DownloadRequestFileModel instance
+        """
+        return cls(object=proto_file.object, object_size=proto_file.object_size)
+
+    def to_proto(self, parent_cls: type[ProtoFileType]) -> ProtoFileType:
+        """
+        Convert this model to a protobuf File message.
+
+        :param parent_cls: The protobuf File message class
+        :return: A protobuf File message instance
+        """
+        return parent_cls(object=self.object, object_size=self.object_size)
 
 
 def sort_files(files: list[DownloadRequestFileModel]) -> list[DownloadRequestFileModel]:
@@ -31,7 +55,7 @@ class DownloadRequestModel(BaseModel):
     user_id: str | None = None
     email: str
     files: Annotated[list[DownloadRequestFileModel], AfterValidator(sort_files)] = Field(
-        default_factory=list, min_length=1
+        default_factory=list, min_length=1,
     )
 
     @computed_field
@@ -49,9 +73,58 @@ class DownloadRequestModel(BaseModel):
     @computed_field
     @property
     def hash(self) -> str:
-        """Generate an MD5 hash of the list of files to be uploaded.
-        Joins the (alphabetically sorted) list with a comma separating the files."""
+        """
+        Generate an MD5 hash of the list of files to be uploaded.
+
+        Joins the (alphabetically sorted) list with a comma separating the files.
+        """
         return md5(
             ",".join(self.filenames).encode("utf-8"),
             usedforsecurity=False,
         ).hexdigest()
+
+    @classmethod
+    def from_message(cls, msg: FileDownloadMessage) -> Self:
+        """
+        Construct a DownloadRequestModel from a FileDownloadMessage protobuf.
+
+        :param msg: The FileDownloadMessage protobuf message
+        :return: A DownloadRequestModel instance
+        """
+        # Import here to avoid circular imports
+        files = [DownloadRequestFileModel.from_proto(f) for f in msg.files]
+        requester = Requester.from_proto(msg.requester)
+
+        return cls(
+            name=requester.name,
+            user_id=requester.id,
+            email=requester.email,
+            files=files,
+        )
+
+    def to_message(self) -> FileDownloadMessage:
+        """
+        Convert this model to a FileDownloadMessage protobuf.
+
+        :return: A FileDownloadMessage protobuf instance
+        """
+        message = FileDownloadMessage()
+        message.requester.CopyFrom(
+            Requester(name=self.name, email=self.email, id=self.user_id).to_proto(
+                FileDownloadMessage.Requester,
+            ),
+        )
+        # Convert each file model to proto and add to message
+        for file_model in self.files:
+            proto_file = file_model.to_proto(FileDownloadMessage.File)
+            message.files.append(proto_file)
+
+        return message
+
+    def to_requester(self) -> Requester:
+        """
+        Extract a Requester namedtuple from this model.
+
+        :return: A Requester instance with name, email, and id from this model
+        """
+        return Requester(name=self.name, email=self.email, id=self.user_id)

@@ -47,22 +47,3 @@ def get_authorized_session(
     credentials.refresh(request)
 
     return AuthorizedSession(credentials, max_refresh_attempts=max_refresh_attempts)
-
-
-def generate_file_hash(files: list[str]) -> tuple[list[str], str]:
-    """
-    Gets the MD5 hash of a list of files, generating the hash by sorting the list of files.
-
-    :param files: The list of file to get the hash of
-    :return: The sorted list of files, and the MD5 hash of the file
-    """
-    # sort the list of files alphabetically (important for consistency/MD5 hashing)
-    sorted_files = sorted(files)
-    # Creates an MD5 hash of the files to be uploaded, joining the list with a comma
-    # separating the files
-    md5_hash = md5(
-        ",".join(sorted_files).encode("utf-8"),
-        usedforsecurity=False,
-    ).hexdigest()
-
-    return sorted_files, md5_hash
