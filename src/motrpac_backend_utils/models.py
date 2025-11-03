@@ -129,6 +129,13 @@ class DownloadRequestModel(BaseModel):
         """
         return Requester(name=self.name, email=self.email, id=self.user_id)
 
+    def __repr__(self) -> str:
+        """Returns a string representation of the request."""
+        return (
+            f"{self.name}{f' ({self.user_id})' if self.user_id else ''} <{self.email}> "
+            f"[{len(self.files)} files, total size: {self.total_size} bytes, hash: {self.hash}]"
+        )
+
 
 T = TypeVar("T", bound="Requester")
 U = TypeVar(
