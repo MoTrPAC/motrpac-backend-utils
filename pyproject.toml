@@ -25,9 +25,10 @@ zipper = [
     "google-cloud-pubsub",
     "psutil",
     "smart-open",
-    "protobuf~=4.21"
+    "protobuf~=6.33",
+    "pydantic>=2.0",
 ]
-messaging = ["google-cloud-pubsub", "protobuf~=4.21"]
+messaging = ["google-cloud-pubsub", "protobuf~=6.33", "pydantic>=2.0"]
 flask = ["flask"]
 
 [dependency-groups]
