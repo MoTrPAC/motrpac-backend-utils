@@ -1,7 +1,7 @@
 #  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
-"""
-A utility module for setting up logging and tracing.
-"""
+"""A utility module for setting up logging and tracing."""
+
+from __future__ import annotations
 
 import logging
 import os
@@ -22,13 +22,16 @@ IS_PROD = bool(int(os.getenv("PRODUCTION_DEPLOYMENT", "0")))
 
 
 def setup_logging_and_tracing(
-    log_level: int = logging.INFO, *, is_prod: bool = IS_PROD,
+    log_level: int = logging.INFO,
+    *,
+    is_prod: bool = IS_PROD,
 ) -> None:
     """
-    Setup local logging/Google Cloud Logging and tracing. It reads an environment
-    variable called `PRODUCTION_DEPLOYMENT` to determine whether to send logs and
-    traces to the Google Cloud Logging and Google Cloud Tracing services. This can be
-    a boolean value, or a string that can be 0 or 1. Do not use when running Google
+    Setup local logging/Google Cloud Logging and tracing.
+
+    It reads an environment variable called `PRODUCTION_DEPLOYMENT` to determine whether to
+    send logs and traces to the Google Cloud Logging and Google Cloud Tracing services.
+    This can be a boolean value, or a string that can be 0 or 1. Do not use when running Google
     Cloud's Functions Framework, since that sets up its own logging, resulting in duplicate
     logs. Instead, in production, use the `LOG_EXECUTION_ID` environment variable to
     set the execution id for the function, and use `setup_tracing()` to set up tracing.
@@ -49,9 +52,7 @@ def setup_logging_and_tracing(
         logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
         logging.getLogger("urllib3.util.retry").setLevel(logging.WARNING)
     else:
-        log_format = (
-            "%(levelname)s %(asctime)s %(name)s:%(funcName)s:%(lineno)s %(message)s"
-        )
+        log_format = "%(levelname)s %(asctime)s %(name)s:%(funcName)s:%(lineno)s %(message)s"
         logging.basicConfig(
             format=log_format,
             datefmt="%I:%M:%S %p",
@@ -60,9 +61,7 @@ def setup_logging_and_tracing(
 
 
 def setup_tracing(*, is_prod: bool = IS_PROD) -> None:
-    """
-    Set up only tracing for the application.
-    """
+    """Set up only tracing for the application."""
     tracer_provider = TracerProvider()
     trace.set_tracer_provider(tracer_provider)
     URLLib3Instrumentor().instrument()

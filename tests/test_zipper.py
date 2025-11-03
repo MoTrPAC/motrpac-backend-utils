@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from motrpac_backend_utils.zipper import estimate_remaining_time, ZipUploader
+from motrpac_backend_utils.zipper import ZipUploader, estimate_remaining_time
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

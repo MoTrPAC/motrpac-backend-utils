@@ -12,7 +12,7 @@ def square(x: int) -> int:
 def test_threadpool_decorator_default_pool() -> None:
     # Test using the default thread pool
     future = square(5)
-    assert future.result() == 25
+    assert future.result() == 25  # noqa: PLR2004
 
 
 @pytest.mark.parametrize(("val", "expected"), [(0, 0), (1, 1), (3, 9), (10, 100)])

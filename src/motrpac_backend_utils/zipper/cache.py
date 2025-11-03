@@ -1,19 +1,20 @@
 #  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
-"""
-Contains a cache class for the zipper and messaging features.
-"""
+"""Contains a cache class for the zipper and messaging features."""
+
+from __future__ import annotations
 
 import time
 from collections import defaultdict
-from multiprocessing import Array, Value
+from typing import TYPE_CHECKING
 
-from motrpac_backend_utils.requester import Requester
+if TYPE_CHECKING:
+    from multiprocessing import Array, Value
+
+    from motrpac_backend_utils.models import Requester
 
 
 class LastMessage:
-    """
-    A utility class for tracking the last message sent.
-    """
+    """Tracks the time of the last message sent."""
 
     def __init__(self, atomic_last_message_time: type[Value]) -> None:
         """
@@ -27,22 +28,17 @@ class LastMessage:
         self.diff = 0
 
     def reset(self) -> None:
-        """
-        Resets the time the last message was received to the current time.
-        """
+        """Resets the time the last message was received to the current time."""
         self.time.value = int(time.time())
 
     def update_diff(self) -> int:
-        """
-        Updates the difference between the current time and the last message time.
-        """
+        """Updates the difference between the current time and the last message time."""
         self.diff = int(time.time()) - self.time.value
         return self.diff
 
     def __lt__(self, other: int) -> bool:
         """
-        Checks if the difference between the current time and the last message time is
-        less than the other value.
+        Checks if the time since the last message is less than `other` seconds.
 
         :param other: The other value to compare to
         :return: Whether the difference between the current time and the last message
@@ -52,8 +48,7 @@ class LastMessage:
 
     def __gt__(self, other: int) -> bool:
         """
-        Checks if the difference between the current time and the last message time is
-        greater than the other value.
+        Checks if the time since the last message is greater than `other` seconds.
 
         :param other: The other value to compare to
         :return: Whether the difference between the current time and the last message
@@ -63,26 +58,21 @@ class LastMessage:
 
 
 class InProgressCache:
-    """
-    A utility class for tracking which files are being processed.
-    """
+    """Tracks which files are being processed in a multi-process environment."""
 
     def __init__(
         self,
         atomic_in_progress: type[Value],
         atomic_processing_hashes: type[Array],
     ) -> None:
-        """
-        Creates a new instance of the InProgressCache.
-        """
+        """Creates a new instance of the InProgressCache."""
         self.cache: defaultdict[str, RequesterSet] = defaultdict()
         self.atomic_in_progress: Value = atomic_in_progress
         self.atomic_processing_hashes = atomic_processing_hashes
 
     def add_requester(self, file_hash: str, requester: Requester) -> None:
         """
-        Adds a filehash to the cache if it does not exist, otherwise it will add the
-        requester.
+        Adds a filehash to the cache if it does not exist, otherwise it will add the requester.
 
         :param file_hash: The file to add
         :param requester: The requester of the file
@@ -95,7 +85,8 @@ class InProgressCache:
 
     def finish_file(self, file_hash: str) -> None:
         """
-        Signals the fileHash has been processed
+        Signals the fileHash has been processed.
+
         :param file_hash: The fileHash to signal as completed processing.
         """
         self.cache[file_hash].finish()
@@ -111,8 +102,7 @@ class InProgressCache:
 
     def remove_requester(self, file_hash: str, requester: Requester) -> None:
         """
-        Removes the requesters from the cache after the request to notify the requester
-        has been made.
+        Removes the requesters from the cache after the request for notification has been made.
 
         :param file_hash: The fileHash to remove the requesters of
         :param requester: The requester to remove
@@ -142,6 +132,8 @@ class InProgressCache:
 
     def update_progress(self) -> None:
         """
+        Update process flags to indicate if any files are still being processed.
+
         Gets whether any files are being processed, and updates the atomic values, which
         are shared across processes and used to determine if the program should continue
         to run.
@@ -162,9 +154,7 @@ class InProgressCache:
 
 
 class RequesterSet:
-    """
-    A utility class for tracking the requesters of the files being processed.
-    """
+    """A utility class for tracking the requesters of the files being processed."""
 
     requesters: set[Requester]
     finished: bool
@@ -214,13 +204,9 @@ class RequesterSet:
         return not self.finished
 
     def resume(self) -> None:
-        """
-        Signals the file hash has not been processed.
-        """
+        """Signals the file hash has not been processed."""
         self.finished = False
 
     def finish(self) -> None:
-        """
-        Signals the file hash has been processed.
-        """
+        """Signals the file hash has been processed."""
         self.finished = True

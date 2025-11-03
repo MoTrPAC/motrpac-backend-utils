@@ -1,20 +1,19 @@
 #  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+"""Utility functions for the zipper module."""
+
+from __future__ import annotations
 
 from collections import defaultdict
 from typing import Any
 
 
 def nested_dict() -> defaultdict:
-    """
-    Creates a default dictionary where each value is another default dictionary.
-    """
+    """Creates a default dictionary where each value is another default dictionary."""
     return defaultdict(nested_dict)
 
 
 def default_to_regular(d: Any) -> dict:
-    """
-    Converts :class:`defaultdict` of :class:`defaultdict` to dict of dicts.
-    """
+    """Converts :class:`defaultdict` of :class:`defaultdict` to dict of dicts."""
     if isinstance(d, defaultdict):
         return {k: default_to_regular(v) for k, v in d.items()}
     return d
@@ -22,7 +21,8 @@ def default_to_regular(d: Any) -> dict:
 
 def get_path_dict(paths: list[str]) -> dict:
     """
-    Creates a dictionary of the paths in the list to a nested dictionary with paths
+    Creates a dictionary of the paths in the list to a nested dictionary with paths.
+
     :param paths: The list of paths to convert
     :return: A nested dictionary with paths.
     """

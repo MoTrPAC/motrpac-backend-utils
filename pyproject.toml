@@ -59,32 +59,18 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.ruff]
-line-length = 90
+line-length = 96
 target-version = "py311"
-exclude = ["*_pb2.py", "*_pb2.pyi"]
+extend-exclude = ["*_pb2.py", "*_pb2.pyi"]
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ANN002",
-    "ANN003",
     "ANN401",
-    "BLE001",
-    "D104",
-    "D105",
-    "D107",
-    "D200",
     "D203",
-    "D205",
     "D212",
-    "D401",
-    "DTZ",
-    "I001",
-    "INP001",
-    "E501",
-    "F401",
-    "PLR2004"
+    "D401"
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*.py" = ["D100", "D101", "D102", "D103", "S101", "S108", "SLF001"]
+"tests/*.py" = ["D100", "D101", "D102", "D103", "INP001", "S101", "S108", "SLF001"]

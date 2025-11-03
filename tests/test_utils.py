@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-from motrpac_backend_utils.utils import get_env, get_authorized_session
 from typing import TYPE_CHECKING
+
+import pytest
+
+from motrpac_backend_utils.utils import get_authorized_session, get_env
 
 if TYPE_CHECKING:
     from pytest_mock import MockFixture
@@ -81,8 +83,7 @@ def test_get_authorized_session_custom_refresh_attempts(
     mocker: MockFixture,
 ) -> None:
     # Test with custom max_refresh_attempts parameter
-    mock_request = mocker.patch("motrpac_backend_utils.utils.Request")
-    mock_request_instance = mock_request.return_value
+    mocker.patch("motrpac_backend_utils.utils.Request")
 
     fake_creds = mocker.MagicMock()
     mocker.patch(

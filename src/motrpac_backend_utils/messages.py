@@ -1,13 +1,15 @@
 #  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 """
-Contains the messaging functions for the backend. When using this,
-make sure that package features "messaging" or "zipper" are used.
+Contains the messaging functions for the backend.
+
+When using this module, make sure that package features "messaging" or "zipper" are used.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from typing import TYPE_CHECKING
 
 from google.api_core.exceptions import GoogleAPICallError
 from google.protobuf.message import Error
@@ -15,11 +17,9 @@ from opentelemetry import trace
 from opentelemetry.instrumentation.utils import http_status_to_status_code
 from opentelemetry.trace import Status
 
+from motrpac_backend_utils.models import DownloadRequestModel, Requester
 from motrpac_backend_utils.proto import FileDownloadMessage, UserNotificationMessage
-from motrpac_backend_utils.requester import Requester
 from motrpac_backend_utils.utils import get_authorized_session
-from motrpac_backend_utils.models import DownloadRequestModel
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from google.auth.transport.requests import AuthorizedSession

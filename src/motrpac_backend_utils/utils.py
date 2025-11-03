@@ -1,20 +1,15 @@
 #  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
-"""
-Utility functions for the MoTrPAC backend utility function package. Recursive utilities, if you will.
-"""
+"""Utility functions for the MoTrPAC backend utility function package."""
 
 import os
-from hashlib import md5
 
-from google.oauth2 import id_token
-from google.auth.compute_engine import IDTokenCredentials
 from google.auth.transport.requests import AuthorizedSession, Request
+from google.oauth2 import id_token
 
 
 def get_env(key: str, default: str | None = None) -> str:
     """
-    Gets an environment variable, or either returns a default value or throws an error
-    if it is not set.
+    Gets an environment variable, return a default value, or raise an error if no default.
 
     :param key: The name of the environment variable
     :param default: The default value to return if the environment variable is not set
@@ -33,8 +28,9 @@ def get_authorized_session(
     max_refresh_attempts: int = 100,
 ) -> AuthorizedSession:
     """
-    Returns a AuthorizedSession (a Request object with the appropriate
-    Authorization  headers) for the user to use to make requests to Google services with.
+    Returns a AuthorizedSession for the user to use to make requests to Google services with.
+
+    AuthorizedSession is a Request object with the appropriate Authorization headers.
 
     :param audience: Used when running in compute engine, this is the HTTP endpoint of
     the service being accessed

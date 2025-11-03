@@ -1,12 +1,14 @@
+#  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
 """
-Contains the ZipUploader class, which is used to zip files and send them to Google Cloud
-Storage. It also contains utilities for sending notifications via Pub/Sub upon
-completion.
+Contains the ZipUploader class, used to create zip files and send them to Google Cloud Storage.
+
+It also contains utilities for sending notifications via Pub/Sub upon completion.
 
 When using this, make sure that package feature "zipper" is used.
 """
 
-#  Copyright (c) 2024. Mihir Samdarshi/MoTrPAC Bioinformatics Center
+from __future__ import annotations
+
 import json
 import logging
 import math
@@ -15,27 +17,29 @@ import shutil
 import time
 from concurrent.futures import Future, as_completed
 from copy import deepcopy
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from multiprocessing import JoinableQueue, Process, Value
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from google.cloud.pubsub_v1.subscriber.message import Message
 from google.cloud.storage import Client as StorageClient
 from opentelemetry import trace
 from psutil import virtual_memory
 from smart_open import open as _smart_open_fn
 
 from motrpac_backend_utils.messages import send_notification_message
-from motrpac_backend_utils.requester import Requester
 from motrpac_backend_utils.threadpool import threadpool
-from .utils import get_path_dict
-from .cache import InProgressCache, LastMessage, RequesterSet
+from motrpac_backend_utils.zipper.utils import get_path_dict
 
+if TYPE_CHECKING:
+    from google.cloud.pubsub_v1.subscriber.message import Message
 
-MAX_IN_PROGRESS = max(os.cpu_count() - 3 or 1, 1)
+    from motrpac_backend_utils.models import Requester
+    from motrpac_backend_utils.zipper.cache import InProgressCache
+
+MAX_IN_PROGRESS = max((os.cpu_count() or 1) - 3, 1)
 
 # setup local logging/Google Cloud Logging
 logger = logging.getLogger()
@@ -46,14 +50,13 @@ class BlobNotFoundError(Exception):
     """Raised when the specified blob could not be found."""
 
     def __init__(self, blob_name: str) -> None:
+        """Initialize the error with a human-readable message."""
         self.blob_name = blob_name
         super().__init__(f"Blob {blob_name} could not be found")
 
 
 class ZipProcessResult(TypedDict):
-    """
-    A dictionary that contains a summary of details regarding the results of a zip process.
-    """
+    """Summary of details regarding the results of a zip process."""
 
     outputBucket: str
     outputPath: str
@@ -63,7 +66,7 @@ class ZipProcessResult(TypedDict):
 
 
 def zip_file_writer(
-    queue: "JoinableQueue[str | bool]",
+    queue: JoinableQueue[str | bool],
     archive: ZipFile,
     file_hash: str,
     processed_counter: type[Value] | None,
@@ -139,7 +142,7 @@ def patch_zip_blob_metadata(
     :param storage_client: The Google Cloud Storage client.
     """
     bucket = storage_client.get_bucket(output_bucket)
-    zip_blob = bucket.blob(os.path.basename(zip_loc))  # noqa PTH119
+    zip_blob = bucket.blob(os.path.basename(zip_loc))  # noqa: PTH119
     zip_blob.custom_time = datetime.now(UTC)
     zip_blob.patch()
 
@@ -149,12 +152,11 @@ def add_to_zip(  # noqa: PLR0913
     zip_loc: str,
     output_bucket: str,
     file_path_prefix: Path,
-    queue: "JoinableQueue[str | bool]",
+    queue: JoinableQueue[str | bool],
     processed_counter: type[Value] | None,
 ) -> bool:
     """
-    Adds files to an archive, working asynchronously, with another process which will
-    tell it which files to process, and when it is done.
+    # Asynchronously add files to an archive, receiving processing instructions via a queue.
 
     :param tmp_dir: The name of the local temporary directory
     :param zip_loc: The name of the zip file to be created
@@ -229,6 +231,7 @@ def estimate_remaining_time(
 ) -> int:
     """
     Estimate the remaining time for the current file to be processed.
+
     :param current_file_count: The number of files that have been processed
     :param total_file_count: The total number of files to be processed
     :param elapsed_time: The time since the process started.
@@ -242,18 +245,20 @@ def estimate_remaining_time(
 
 
 class ZipUploadError(Exception):
-    """
-    An exception class to represent errors that occur during the zip upload process.
-    """
+    """An exception class to represent errors that occur during the zip upload process."""
 
 
 class ZipUploader:
     """
-    A class to create and upload a zip file to Google Cloud Storage from a list of files
-    (also in Google Cloud Storage).
+    Class for uploading, managing, and notifying requesters about ZIP file archives.
+
+    Handles the creation, management, and uploading of zip archives to Google Cloud Storage
+    based on an input list of files. Also manages notification of requesters upon successful
+    upload, tracks ongoing processing via a cache, and supports integration with Pub/Sub
+    messaging and temporary file handling.
     """
 
-    def __init__(    # noqa: PLR0913
+    def __init__(  # noqa: PLR0913
         self,
         files: list[str],
         file_hash: str,
@@ -269,9 +274,11 @@ class ZipUploader:
         ack_deadline: int = 600,
     ) -> None:
         """
-        Initialize the ZipUploader class. This has two functionalities: one to both create
-        and upload a zip file to Google Cloud Storage, and one to just notify the
-        requester, if the zip file was already created by the zip class.
+        Initialize the ZipUploader class.
+
+        This class can be initialized to either create and upload a zip file to Google
+        Cloud Storage, or to just notify the requester, if the zip file was already
+        created by the zip class.
 
         :param files: A list of files to be zipped and uploaded to Google Cloud Storage
         :param file_hash: The hash of the files to be zipped and uploaded. Ideally, the
@@ -330,7 +337,7 @@ class ZipUploader:
         # the message from the PubSub pull subscription if that is the source of the
         # ZipUploader
         if self.message is not None:
-            deadline = datetime.fromtimestamp(message._received_timestamp)  # noqa: SLF001
+            deadline = datetime.fromtimestamp(message._received_timestamp, tz=UTC)  # noqa: SLF001
             # set some attributes on the message for our own tracking use
             message.ack_deadline = ack_deadline
             message.ack_start_time = deadline
@@ -339,15 +346,11 @@ class ZipUploader:
 
     @property
     def log_prefix(self) -> str:
-        """
-        A prefix to use for logging statements.
-        """
+        """A prefix to use for logging statements."""
         return f"[File Hash: {self.file_hash}]"
 
     def setup_processing(self) -> None:
-        """
-        Set up processing the zip file.
-        """
+        """Set up processing the zip file."""
         logger.debug("%s Creating tmp directory", self.log_prefix)
         # the path to download the files to
         self.file_dl_location.mkdir(parents=True, exist_ok=True)
@@ -356,6 +359,8 @@ class ZipUploader:
     @threadpool
     def get_file(self, dl_object: str) -> Path | None:
         """
+        Asynchronously downloads a file from Google Cloud Storage to the local filesystem.
+
         Downloads a file from Google Cloud Storage to the local filesystem, returns early
         if the file already exists, pauses if the file is currently being downloaded.
 
@@ -406,13 +411,12 @@ class ZipUploader:
 
     def create_zip(self) -> None:
         """
-        Create a process that will zip files. This process will watch a queue for
-        messages sent from the queue and write them to the archive. This method will
-        concurrently download the files that a user has requested to download and, once
-        each file has downloaded, will place a message in the queue with the local\
-        file path of the zipped file.
+        Create a process that will zip files.
 
-        :return:
+        This process will watch a queue for messages sent from the queue and write them to the
+        archive. This method will concurrently download the files that a user has requested to
+        download and, once each file has downloaded, will place a message in the queue with the
+        local file path of the zipped file.
         """
         # Asynchronously download each file in the request using a threadpool
         futures: list[Future[Path | None]] = [self.get_file(file) for file in self.files]
@@ -483,7 +487,7 @@ class ZipUploader:
         :param current_num_files: The number of files that have been downloaded/processed
         """
         # calculate the time elapsed since the process started
-        elapsed_time = (datetime.now() - self.message.ack_start_time).total_seconds()
+        elapsed_time = (datetime.now(tz=UTC) - self.message.ack_start_time).total_seconds()
         logger.debug(
             "%s Elapsed time/ack deadline threshold: %s seconds / %s seconds",
             self.log_prefix,
@@ -505,12 +509,10 @@ class ZipUploader:
             self.message.modify_ack_deadline(new_deadline)
             # reset the start time and new ack deadline
             self.message.ack_deadline = new_deadline
-            self.message.ack_start_time = datetime.now()
+            self.message.ack_start_time = datetime.now(tz=UTC)
 
     def cleanup_create_zip(self, proc: Process) -> None:
-        """
-        Closes/joins the queue and zip file creation process.
-        """
+        """Closes/joins the queue and zip file creation process."""
         self.queue.put(obj=False)
         self.queue.join()
         self.queue.close()
@@ -552,9 +554,7 @@ class ZipUploader:
         }
 
     def send_notification(self) -> None:
-        """
-        Sends a notification to the user.
-        """
+        """Sends a notification to the user."""
         if self.in_progress_cache is not None:
             self.requesters = list(
                 self.in_progress_cache.get_requesters(self.file_hash),
@@ -582,9 +582,7 @@ class ZipUploader:
         self.successful_result()
 
     def process_and_notify_requesters(self) -> None:
-        """
-        Processes the request, constructs the zip archive to the storage bucket.
-        """
+        """Processes the request, constructs the zip archive to the storage bucket."""
         with tracer.start_as_current_span(self.file_hash):
             try:
                 t1 = time.perf_counter()
