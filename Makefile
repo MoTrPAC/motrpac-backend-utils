@@ -1,5 +1,5 @@
 CWD := $(abspath $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST))))))
-PROTO_DIR = motrpac_backend_utils/proto
+PROTO_DIR = src/motrpac_backend_utils/proto
 PROTO_PATH = proto
 VENV_PATH := $(CWD)/.venv/bin
 
