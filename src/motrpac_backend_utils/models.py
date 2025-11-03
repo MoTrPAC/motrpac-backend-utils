@@ -5,9 +5,9 @@ from __future__ import annotations
 from hashlib import md5
 from typing import Annotated, Self, TypeVar
 
-from motrpac_backend_utils.proto import FileDownloadMessage
-from motrpac_backend_utils.requester import Requester
-from pydantic import AfterValidator, BaseModel, Field, computed_field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, computed_field
+
+from motrpac_backend_utils.proto import FileDownloadMessage, UserNotificationMessage
 
 # Type variable for protobuf File message types
 ProtoFileType = TypeVar("ProtoFileType")
@@ -128,3 +128,44 @@ class DownloadRequestModel(BaseModel):
         :return: A Requester instance with name, email, and id from this model
         """
         return Requester(name=self.name, email=self.email, id=self.user_id)
+
+
+T = TypeVar("T", bound="Requester")
+U = TypeVar(
+    "U",
+    UserNotificationMessage.Requester,
+    FileDownloadMessage.Requester,
+)
+
+
+class Requester(BaseModel):
+    """A Pydantic model representing a single requester."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    email: str
+    id: str | None = None
+
+    def to_proto(self, parent_cls: type[U]) -> U:
+        """Converts this Requester object to a protobuf object."""
+        return parent_cls(name=self.name, email=self.email, id=self.id)
+
+    @classmethod
+    def from_proto(cls, proto: U) -> Self:
+        """Converts a protobuf object to this Requester object."""
+        return cls(name=proto.name, email=proto.email, id=proto.id)
+
+    @classmethod
+    def from_model(cls, model: DownloadRequestModel) -> Self:
+        """
+        Extract a Requester from a DownloadRequestModel.
+
+        :param model: The DownloadRequestModel instance
+        :return: A Requester instance
+        """
+        return cls(name=model.name, email=model.email, id=model.user_id)
+
+    def __repr__(self) -> str:
+        """Returns a string representation of the requester."""
+        return f"{self.name} ({self.id}) <{self.email}>"
