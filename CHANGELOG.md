@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2025-11-03
+
+### Features
+
+- [**breaking**] Add File message to FileDownloadMessage instead of repeated string for field
+- Add `__repr__` method for `Requester` Pydantic model
+
+### Miscellaneous Tasks
+
+- Update PROTO_DIR path in Makefile to reflect new src directory structure
+- Update dependencies, add missing `pydantic` dep and upgrade `protobuf` to `~6.33`
+
+### Refactor
+
+- [**breaking**] Improve message handling and consolidate FileDownload logic
+- Replace NamedTuple-based `Requester` with Pydantic model
+- Update Ruff rules, improve typing hints and update imports for consistency
+
 ## [0.9.4] - 2025-11-02
 
 ### Bug Fixes
