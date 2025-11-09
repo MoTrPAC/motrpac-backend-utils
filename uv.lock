@@ -563,6 +563,7 @@ dependencies = [
     { name = "opentelemetry-instrumentation-threading" },
     { name = "opentelemetry-instrumentation-urllib3" },
     { name = "opentelemetry-propagator-gcp" },
+    { name = "opentelemetry-resourcedetector-gcp" },
     { name = "opentelemetry-sdk" },
     { name = "typing-extensions" },
 ]
@@ -609,6 +610,7 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-threading" },
     { name = "opentelemetry-instrumentation-urllib3" },
     { name = "opentelemetry-propagator-gcp" },
+    { name = "opentelemetry-resourcedetector-gcp" },
     { name = "opentelemetry-sdk" },
     { name = "protobuf", marker = "extra == 'messaging'", specifier = "~=6.33" },
     { name = "protobuf", marker = "extra == 'zipper'", specifier = "~=6.33" },

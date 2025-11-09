@@ -15,6 +15,7 @@ dependencies = [
     "opentelemetry-instrumentation-threading",
     "opentelemetry-instrumentation-urllib3",
     "opentelemetry-propagator-gcp",
+    "opentelemetry-resourcedetector-gcp",
     "opentelemetry-sdk",
     "typing-extensions",
 ]
