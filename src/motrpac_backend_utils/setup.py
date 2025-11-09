@@ -100,10 +100,21 @@ def setup_tracing(
         or extend the auto-detected GCP attributes. These will be merged with detected
         attributes, with explicitly provided values taking precedence.
     """
+    # Start with a base resource with the service name and service version, which the
+    # Google Cloud Resource Detector doesn't detect.
+    if os.getenv("K_SERVICE") and os.getenv("K_REVISION"):
+        base_resource = Resource.create(
+            attributes={
+                "service.name": os.getenv("K_SERVICE", "unknown"),
+                "service.version": os.getenv("K_REVISION", "unknown"),
+            },
+        )
+    else:
+        base_resource = Resource.create({})
     # Use the official Google Cloud resource detector
     # This automatically detects Cloud Run, GCE, GKE, Cloud Functions, etc.
     gcp_detector = GoogleCloudResourceDetector(raise_on_error=False)
-    detected_resource = get_aggregated_resources([gcp_detector])
+    detected_resource = get_aggregated_resources([gcp_detector], initial_resource=base_resource)
 
     # Merge with custom resource attributes if provided
     if resource_attributes:

@@ -55,7 +55,8 @@ class DownloadRequestModel(BaseModel):
     user_id: str | None = None
     email: str
     files: Annotated[list[DownloadRequestFileModel], AfterValidator(sort_files)] = Field(
-        default_factory=list, min_length=1,
+        default_factory=list,
+        min_length=1,
     )
 
     @computed_field
