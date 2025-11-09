@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.1] - 2025-11-09
+
+### Features
+
+- Add automatic OpenTelemetry Resource detection to tracing setup
+
 ## [0.10.0] - 2025-11-03
 
 ### Features
