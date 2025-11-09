@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.2] - 2025-11-09
+
+### Miscellaneous Tasks
+
+- Update setup.py for improved Google Cloud resource detection
+
 ## [0.10.1] - 2025-11-09
 
 ### Features
