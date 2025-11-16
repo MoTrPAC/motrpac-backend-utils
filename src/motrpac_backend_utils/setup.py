@@ -83,16 +83,16 @@ def setup_logging_and_tracing(
         logging.getLogger("urllib3.util.retry").setLevel(logging.WARNING)
         logger = logging.getLogger(__name__)
         logger.debug("Functions Framework detected, deferring to its logging configuration")
-        return
-
-    # Functions Framework not active - setup our own logging
-    if is_prod:
+        # Functions Framework not active - setup our own logging
+    elif is_prod:
         client = LoggingClient()
         handler = client.get_default_handler()
         setup_logging(handler, log_level=log_level)
         logging.getLogger("requests").setLevel(logging.WARNING)
         logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
         logging.getLogger("urllib3.util.retry").setLevel(logging.WARNING)
+        logger = logging.getLogger(__name__)
+        logger.debug("Production: Setting up Cloud Logging")
     else:
         log_format = "%(levelname)s %(asctime)s %(name)s:%(funcName)s:%(lineno)s %(message)s"
         logging.basicConfig(
@@ -100,6 +100,8 @@ def setup_logging_and_tracing(
             datefmt="%I:%M:%S %p",
             level=log_level,
         )
+        logger = logging.getLogger(__name__)
+        logger.debug("Development: Setting up local logging")
 
 
 def setup_tracing(
@@ -153,7 +155,7 @@ def setup_tracing(
     trace.set_tracer_provider(tracer_provider)
     URLLib3Instrumentor().instrument()
     ThreadingInstrumentor().instrument()
-    LoggingInstrumentor().instrument(set_logging_format=is_prod)
+    LoggingInstrumentor().instrument(set_logging_format=False)
     if is_prod:
         trace_exporter = CloudTraceSpanExporter()
         tracer_provider.add_span_processor(
