@@ -21,6 +21,8 @@ from opentelemetry.sdk.resources import Resource, get_aggregated_resources
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+from motrpac_backend_utils.context import is_functions_framework_active
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -34,14 +36,23 @@ def setup_logging_and_tracing(
     resource_attributes: Mapping[str, str | bool | int | float] | None = None,
 ) -> None:
     """
-    Setup local logging/Google Cloud Logging and tracing.
+    Setup logging and tracing for the application.
 
-    It reads an environment variable called `PRODUCTION_DEPLOYMENT` to determine whether to
-    send logs and traces to the Google Cloud Logging and Google Cloud Tracing services.
-    This can be a boolean value, or a string that can be 0 or 1. Do not use when running Google
-    Cloud's Functions Framework, since that sets up its own logging, resulting in duplicate
-    logs. Instead, in production, use the `LOG_EXECUTION_ID` environment variable to
-    set the execution id for the function, and use `setup_tracing()` to set up tracing.
+    Automatically detects if Functions Framework is managing logging and defers to it
+    to prevent duplicate log entries. This means you can safely call this function
+    regardless of whether you're using Functions Framework, FastAPI, Flask, or any
+    other web framework.
+
+    When Functions Framework is active (LOG_EXECUTION_ID set or FUNCTION_TARGET set):
+    - Only sets up tracing
+    - Adjusts log levels for noisy libraries
+    - Lets Functions Framework handle logging and execution context
+    - No duplicate logs will appear in Cloud Logging
+
+    Otherwise:
+    - Sets up Cloud Logging (production) or local logging (development)
+    - Sets up OpenTelemetry tracing
+    - Integrates with Cloud Trace for trace correlation
 
     When running on Google Cloud Platform (GCP), the function automatically detects the
     environment using the official GoogleCloudResourceDetector and populates the Resource
@@ -59,9 +70,22 @@ def setup_logging_and_tracing(
         or extend the auto-detected GCP attributes. These will be merged with detected
         attributes, with explicitly provided values taking precedence.
     """
-    # setup tracing/Google Cloud Tracing if we are in production
+    # Always setup tracing
     setup_tracing(is_prod=is_prod, resource_attributes=resource_attributes)
 
+    # Check if Functions Framework is managing logging
+    if is_functions_framework_active():
+        # Functions Framework is handling logging - only adjust log levels for noisy libraries
+        # Note: FF's LoggingHandlerAddExecutionId already adds execution_id and span_id
+        # from Function-Execution-Id and X-Cloud-Trace-Context headers
+        logging.getLogger("requests").setLevel(logging.WARNING)
+        logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+        logging.getLogger("urllib3.util.retry").setLevel(logging.WARNING)
+        logger = logging.getLogger(__name__)
+        logger.debug("Functions Framework detected, deferring to its logging configuration")
+        return
+
+    # Functions Framework not active - setup our own logging
     if is_prod:
         client = LoggingClient()
         handler = client.get_default_handler()
