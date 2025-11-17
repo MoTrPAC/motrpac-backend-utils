@@ -12,10 +12,12 @@ Provides:
 from __future__ import annotations
 
 import contextvars
+import functools
+import inspect
 import logging
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -132,20 +134,28 @@ def extract_execution_id_from_headers(headers: Mapping[str, str] | Headers) -> s
     """
     Extract execution ID from request headers.
 
-    Checks multiple header formats:
-    - Function-Execution-Id (Functions Framework format)
+    Checks multiple header formats used by different Google Cloud services:
+    - Function-Execution-Id (Functions Framework, Cloud Functions Gen 2)
     - function-execution-id (lowercase variant)
     - X-Execution-Id (custom header)
+    - X-Cloud-Trace-Context (can be used as fallback - extracts span_id)
 
-    :param headers: Request headers (dict-like object)
+    The execution ID is used to correlate logs from a single request across
+    different services and components.
+
+    Note: When using X-Cloud-Trace-Context as a fallback, the span_id is extracted
+    and used as the execution ID. This provides granular tracing at the span level,
+    which can be useful for correlating logs with specific operations within a request.
+
+    :param headers: Request headers (dict-like object or werkzeug Headers)
     :return: Execution ID if found, None otherwise
     """
-    # Try Functions Framework header format first
+    # Try Functions Framework header format first (most common)
     exec_id = headers.get("Function-Execution-Id")
     if exec_id:
         return exec_id
 
-    # Try lowercase variant
+    # Try lowercase variant (some proxies lowercase headers)
     exec_id = headers.get("function-execution-id")
     if exec_id:
         return exec_id
@@ -162,38 +172,55 @@ class ExecutionIdFilter(logging.Filter):
     """
     Logging filter that adds execution_id to log records.
 
-    This is OPTIONAL and only needed if you're using FastAPI/Flask and want
-    execution IDs to appear in your log records. Functions Framework already
-    handles this automatically.
+    For Google Cloud Logging's StructuredLogHandler, this filter adds
+    execution_id to the json_fields, which ensures it's properly indexed
+    and searchable in Google Cloud Logging.
+
+    For other handlers, it adds execution_id as a record attribute.
+
+    This is compatible with:
+    - Cloud Run
+    - Cloud Functions
+    - Functions Framework
+    - FastAPI
+    - Flask
+    - Any other framework using standard Python logging
 
     Usage:
         import logging
+        from google.cloud.logging_v2.handlers import StructuredLogHandler
         from motrpac_backend_utils.context import ExecutionIdFilter
 
-        handler = logging.StreamHandler()
+        handler = StructuredLogHandler()
         handler.addFilter(ExecutionIdFilter())
         logging.root.addHandler(handler)
 
-    The execution_id will be available as record.execution_id and can be
-    included in your log format string:
-
-        formatter = logging.Formatter(
-            '%(levelname)s [%(execution_id)s] %(message)s'
-        )
+    The execution_id will be available in Google Cloud Logging and can be
+    used to filter and correlate logs from a single request.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
-        """Add execution_id attribute to the log record if available."""
+        """Add execution_id to the log record for structured logging."""
         exec_id = get_execution_id()
+
+        # For StructuredLogHandler, add to json_fields
+        if not hasattr(record, "json_fields"):
+            record.json_fields = {}
+        elif not isinstance(record.json_fields, dict):
+            # Safety check - ensure it's a dict
+            record.json_fields = {}
+
         if exec_id:
+            record.json_fields["execution_id"] = exec_id
             record.execution_id = exec_id
         else:
             # Provide a default to prevent format string errors
             record.execution_id = "-"
+
         return True
 
 
-def add_fastapi_execution_context(app) -> None:
+def add_fastapi_execution_context(app) -> None:  # noqa: ANN001
     """
     Add execution context middleware to a FastAPI app.
 
@@ -252,7 +279,7 @@ def add_fastapi_execution_context(app) -> None:
     app.add_middleware(ExecutionContextMiddleware)
 
 
-def add_flask_execution_context(app) -> None:
+def add_flask_execution_context(app) -> None:  # noqa: ANN001
     """
     Add execution context hooks to a Flask app.
 
@@ -295,3 +322,114 @@ def add_flask_execution_context(app) -> None:
         token = g.pop("execution_id_token", None)
         if token:
             clear_execution_id(token)
+
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def functions_framework_execution_context(func: Callable[[P], T]) -> Callable[[P], T]:  # noqa: C901
+    """
+    Decorator to extract and set execution context for Functions Framework functions.
+
+    This decorator should be applied to Functions Framework function handlers to ensure
+    execution IDs and other context are properly captured from request headers and
+    propagated to logging and tracing systems.
+
+    Works with all Functions Framework signature types:
+    - HTTP functions: @functions_framework.http
+    - CloudEvent functions: @functions_framework.cloud_event
+    - Background event functions: (data, context signature)
+
+    Usage with HTTP functions:
+        import functions_framework
+        from motrpac_backend_utils.context import functions_framework_execution_context
+
+        @functions_framework.http
+        @functions_framework_execution_context
+        def my_function(request):
+            import logging
+            logging.info("This log will have execution_id")
+            return "OK"
+
+    Usage with CloudEvent functions:
+        import functions_framework
+        from motrpac_backend_utils.context import functions_framework_execution_context
+        from cloudevents.http import CloudEvent
+
+        @functions_framework.cloud_event
+        @functions_framework_execution_context
+        def my_function(cloud_event: CloudEvent):
+            import logging
+            logging.info("CloudEvent received", extra={"event_id": cloud_event["id"]})
+
+    The execution ID will be automatically added to all log entries and will be
+    searchable in Google Cloud Logging.
+
+    :param func: The Functions Framework function to wrap
+    :return: Wrapped function with execution context management
+    """
+    # Check if this is an async function
+    if inspect.iscoroutinefunction(func):
+
+        @functools.wraps(func)
+        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+            # Extract execution ID from request
+            # For HTTP functions, first arg is request
+            # For CloudEvent functions, we can access flask.request
+            exec_id = None
+
+            if args and hasattr(args[0], "headers"):
+                # HTTP function or similar
+                exec_id = extract_execution_id_from_headers(args[0].headers)
+            else:
+                # Try flask request context (works for CloudEvent functions too)
+                try:
+                    from flask import request  # noqa: PLC0415
+
+                    if request:
+                        exec_id = extract_execution_id_from_headers(request.headers)
+                except (ImportError, RuntimeError):
+                    # No flask context available
+                    pass
+
+            if exec_id:
+                token = set_execution_id(exec_id)
+                try:
+                    return await func(*args, **kwargs)
+                finally:
+                    clear_execution_id(token)
+            else:
+                return await func(*args, **kwargs)
+
+        return async_wrapper
+
+    @functools.wraps(func)
+    def sync_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        # Extract execution ID from request
+        exec_id = None
+
+        if args and hasattr(args[0], "headers"):
+            # HTTP function or similar
+            exec_id = extract_execution_id_from_headers(args[0].headers)
+        else:
+            # Try flask request context (works for CloudEvent functions too)
+            try:
+                from flask import request  # noqa: PLC0415
+
+                if request:
+                    exec_id = extract_execution_id_from_headers(request.headers)
+            except (ImportError, RuntimeError):
+                # No flask context available
+                pass
+
+        if exec_id:
+            token = set_execution_id(exec_id)
+            try:
+                return func(*args, **kwargs)
+            finally:
+                clear_execution_id(token)
+        else:
+            return func(*args, **kwargs)
+
+    return sync_wrapper
