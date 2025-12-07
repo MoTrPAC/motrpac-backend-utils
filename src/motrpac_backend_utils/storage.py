@@ -3,12 +3,50 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from requests.adapters import HTTPAdapter
 
 if TYPE_CHECKING:
     from google.cloud.storage import Client as StorageClient
+
+
+class GcsPath(NamedTuple):
+    """Represents a GCS path."""
+
+    bucket: str
+    key: str
+
+
+def parse_bucket_path(path: str) -> GcsPath:
+    """
+    Split a full GCS path in bucket and key strings. `'gs://bucket/key'` -> `('bucket', 'key')`.
+
+    :param path: GCS path (e.g., gs://bucket/key).
+    :return: Tuple of bucket and key strings
+    :raises ValueError: If the path is not a valid GCS path.
+    """
+    gcs_prefix = "gs://"
+
+    if not path.startswith(gcs_prefix):
+        msg = f"'{path}' is not a valid path. It MUST start with 'gs://'"
+        raise ValueError(msg)
+
+    parts = path.replace(gcs_prefix, "").split("/", 1)
+
+    bucket: str = parts[0]
+    if not bucket:
+        msg = "Empty bucket name received"
+        raise ValueError(msg)
+    if "/" in bucket or bucket == " ":
+        msg = f"'{bucket}' is not a valid bucket name."
+        raise ValueError(msg)
+
+    key: str = ""
+    if len(parts) == 2:  # noqa: PLR2004
+        key = key if parts[1] is None else parts[1]
+
+    return GcsPath(bucket, key)
 
 
 def modify_storage_client_adapters(
