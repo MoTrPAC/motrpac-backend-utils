@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2025-12-07
+
+### Bug Fixes
+
+- Correct logging setup for production
+
+### Features
+
+- Enhance execution context management for FastAPI and Flask
+- Add utility to modify Google Cloud Storage client for optimized connection pooling
+- Improve execution context and structured logging integration
+- Add helper function for parsing GCS paths
+
+### Miscellaneous Tasks
+
+- Add new optional dependencies to env, based on new functions
+- Update Makefile to use `uv version` instead of sed for version bumps
+
+### Testing
+
+- Add tests for new setup and execution id tracking
+- Add unit and integration tests for Functions Framework execution context and structured logging
+
 ## [0.10.2] - 2025-11-09
 
 ### Miscellaneous Tasks
