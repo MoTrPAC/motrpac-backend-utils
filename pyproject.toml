@@ -32,7 +32,7 @@ flask = ["flask"]
 
 [dependency-groups]
 dev = ["ruff"]
-test = ["pytest~=8.4.2", "pytest-mock~=3.14",  "pytest-cov~=7.0"]
+test = ["pytest~=9.0.2", "pytest-mock~=3.14",  "pytest-cov~=7.0"]
 
 [build-system]
 requires = ["hatchling"]
