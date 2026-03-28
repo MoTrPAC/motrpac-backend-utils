@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.1] - 2026-03-28
+
+### Features
+
+- Add NotificationError and improve error handling in zip processing
+- Add retry logic for notification delivery
+
+### Miscellaneous Tasks
+
+- *(ci)* Bump actions/checkout from 5 to 6 in the actions group
+- *(ci)* Bump actions/cache from 4 to 5 in the actions group
+- *(ci)* Bump actions/checkout from 5 to 6 in the actions group
+- *(ci)* Bump actions/cache from 4 to 5 in the actions group
+- Add `tenacity` dependency for retry logic
+
+### Testing
+
+- Add unit tests for notification and zip processing error scenarios
+
 ## [0.11.0] - 2025-12-07
 
 ### Bug Fixes
