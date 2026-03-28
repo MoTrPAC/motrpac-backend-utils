@@ -17,6 +17,7 @@ dependencies = [
     "opentelemetry-propagator-gcp",
     "opentelemetry-resourcedetector-gcp",
     "opentelemetry-sdk",
+    "tenacity>=8.0",
     "typing-extensions",
 ]
 

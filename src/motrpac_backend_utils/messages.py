@@ -16,6 +16,15 @@ from google.protobuf.message import Error
 from opentelemetry import trace
 from opentelemetry.instrumentation.utils import http_status_to_status_code
 from opentelemetry.trace import Status
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from motrpac_backend_utils.models import DownloadRequestModel, Requester
 from motrpac_backend_utils.proto import FileDownloadMessage, UserNotificationMessage
@@ -26,6 +35,30 @@ if TYPE_CHECKING:
     from google.cloud.pubsub_v1 import PublisherClient
 
 logger = logging.getLogger(__name__)
+
+_NOTIFICATION_TIMEOUT = 30
+_NOTIFICATION_MAX_RETRIES = 3
+
+
+@retry(
+    stop=stop_after_attempt(_NOTIFICATION_MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type((RequestsConnectionError, Timeout)),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+def _send_notification(
+    session: AuthorizedSession,
+    url: str,
+    data: bytes,
+) -> None:
+    """Post notification with retry logic for transient network failures."""
+    session.post(
+        url=url,
+        data=data,
+        headers={"Content-Type": "application/octet-stream"},
+        timeout=_NOTIFICATION_TIMEOUT,
+    )
 
 
 def decode_file_download_message(message: bytes) -> DownloadRequestModel:
@@ -125,11 +158,7 @@ def send_notification_message(  # noqa: PLR0913
 
         if session is None:
             session = get_authorized_session(url)
-        session.post(
-            url=url,
-            data=msg_data,
-            headers={"Content-Type": "application/octet-stream"},
-        )
+        _send_notification(session, url, msg_data)
 
     # pylint: disable=broad-except
     except Exception as e:

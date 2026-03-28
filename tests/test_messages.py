@@ -2,16 +2,22 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock
 
 import pytest
 from google.api_core.exceptions import GoogleAPICallError
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout
 
 from motrpac_backend_utils.messages import (
+    _NOTIFICATION_MAX_RETRIES,
+    _NOTIFICATION_TIMEOUT,
     decode_file_download_message,
     publish_file_download_message,
+    send_notification_message,
 )
 from motrpac_backend_utils.models import (
     DownloadRequestFileModel,
@@ -161,3 +167,102 @@ def test_publish_file_download_message_failure(
             sample_request["topic_id"],
             client,
         )
+
+
+@pytest.fixture
+def mock_session(mocker: MockerFixture) -> MagicMock:
+    mock_sess = mocker.MagicMock()
+    mocker.patch(
+        "motrpac_backend_utils.messages.get_authorized_session",
+        return_value=mock_sess,
+    )
+    return mock_sess
+
+
+def test_send_notification_message_success(mock_session: MagicMock) -> None:
+    send_notification_message(
+        name="John Doe",
+        user_id="user123",
+        email="john@example.com",
+        output_filename="output.zip",
+        manifest=["file1.txt", "file2.txt"],
+        url="https://example.com/notify",
+    )
+
+    mock_session.post.assert_called_once()
+    call_kwargs = mock_session.post.call_args
+    assert call_kwargs.kwargs.get("timeout") == _NOTIFICATION_TIMEOUT
+
+
+def test_send_notification_message_retries_on_connection_error(
+    mock_session: MagicMock,
+) -> None:
+    mock_session.post.side_effect = [
+        RequestsConnectionError(),
+        RequestsConnectionError(),
+        MagicMock(),
+    ]
+
+    send_notification_message(
+        name="John Doe",
+        user_id="user123",
+        email="john@example.com",
+        output_filename="output.zip",
+        manifest=["file1.txt"],
+        url="https://example.com/notify",
+    )
+
+    assert mock_session.post.call_count == _NOTIFICATION_MAX_RETRIES
+
+
+def test_send_notification_message_retries_on_timeout(
+    mock_session: MagicMock,
+) -> None:
+    mock_session.post.side_effect = [Timeout(), Timeout(), MagicMock()]
+
+    send_notification_message(
+        name="John Doe",
+        user_id="user123",
+        email="john@example.com",
+        output_filename="output.zip",
+        manifest=["file1.txt"],
+        url="https://example.com/notify",
+    )
+
+    assert mock_session.post.call_count == _NOTIFICATION_MAX_RETRIES
+
+
+def test_send_notification_message_raises_after_max_retries(
+    mock_session: MagicMock,
+) -> None:
+    mock_session.post.side_effect = RequestsConnectionError()
+
+    with pytest.raises(RequestsConnectionError):
+        send_notification_message(
+            name="John Doe",
+            user_id="user123",
+            email="john@example.com",
+            output_filename="output.zip",
+            manifest=["file1.txt"],
+            url="https://example.com/notify",
+        )
+
+    assert mock_session.post.call_count == _NOTIFICATION_MAX_RETRIES
+
+
+def test_send_notification_message_no_retry_on_non_network_error(
+    mock_session: MagicMock,
+) -> None:
+    mock_session.post.side_effect = ValueError("unexpected error")
+
+    with pytest.raises(ValueError, match="unexpected error"):
+        send_notification_message(
+            name="John Doe",
+            user_id="user123",
+            email="john@example.com",
+            output_filename="output.zip",
+            manifest=["file1.txt"],
+            url="https://example.com/notify",
+        )
+
+    assert mock_session.post.call_count == 1
