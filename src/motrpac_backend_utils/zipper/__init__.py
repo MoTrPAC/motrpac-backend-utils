@@ -248,6 +248,10 @@ class ZipUploadError(Exception):
     """An exception class to represent errors that occur during the zip upload process."""
 
 
+class NotificationError(Exception):
+    """Raised when notification delivery fails after the zip was successfully created."""
+
+
 class ZipUploader:
     """
     Class for uploading, managing, and notifying requesters about ZIP file archives.
@@ -578,24 +582,39 @@ class ZipUploader:
 
         :return:
         """
-        self.send_notification()
+        try:
+            self.send_notification()
+        except Exception as e:
+            raise NotificationError from e
         self.successful_result()
 
     def process_and_notify_requesters(self) -> None:
         """Processes the request, constructs the zip archive to the storage bucket."""
         with tracer.start_as_current_span(self.file_hash):
+            t1 = time.perf_counter()
             try:
-                t1 = time.perf_counter()
                 logger.info("%s Begin processing", self.log_prefix)
                 self.setup_processing()
                 self.create_zip()
                 self.check_zip_exists_in_bucket()
-                self.send_notification()
-                self.successful_result()
-                t2 = time.perf_counter()
-                logger.info("%s REQUEST TIMER: %s seconds", self.log_prefix, t2 - t1)
             except Exception as e:
                 logger.exception("Exception occurred while processing files.")
                 if self.tmp_dir_path:
                     shutil.rmtree(self.tmp_dir_path)
                 raise ZipUploadError from e
+
+            if self.in_progress_cache is not None:
+                self.in_progress_cache.finish_file(self.file_hash)
+
+            try:
+                self.send_notification()
+            except Exception as e:
+                logger.exception(
+                    "%s Zip created successfully but notification failed.",
+                    self.log_prefix,
+                )
+                raise NotificationError from e
+
+            self.successful_result()
+            t2 = time.perf_counter()
+            logger.info("%s REQUEST TIMER: %s seconds", self.log_prefix, t2 - t1)
