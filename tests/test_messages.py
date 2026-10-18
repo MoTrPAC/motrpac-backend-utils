@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
@@ -8,9 +9,15 @@ import pytest
 from google.api_core.exceptions import GoogleAPICallError
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    ConsoleSpanExporter,
+    SimpleSpanProcessor,
+)
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from requests import Response
 from requests.exceptions import ConnectionError as RequestsConnectionError
-from requests.exceptions import Timeout
+from requests.exceptions import HTTPError, Timeout
 
 from motrpac_backend_utils.messages import (
     _NOTIFICATION_MAX_RETRIES,
@@ -170,6 +177,61 @@ def test_publish_file_download_message_failure(
 
 
 @pytest.fixture
+def span_exporter(mocker: MockerFixture) -> InMemorySpanExporter:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    mocker.patch(
+        "motrpac_backend_utils.messages.trace.get_tracer",
+        return_value=provider.get_tracer(__name__),
+    )
+    return exporter
+
+
+def test_publish_file_download_message_keeps_pii_out_of_traces_and_logs(
+    sample_request: dict[str, Any],
+    sample_model: DownloadRequestModel,
+    mock_pubsub: tuple[Any, Any],
+    span_exporter: InMemorySpanExporter,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client, _ = mock_pubsub
+
+    with caplog.at_level(logging.DEBUG, logger="motrpac_backend_utils.messages"):
+        publish_file_download_message(sample_model, sample_request["topic_id"], client)
+
+    (span,) = span_exporter.get_finished_spans()
+    assert dict(span.attributes) == {
+        "request.hash": sample_model.hash,
+        "request.file_count": len(sample_request["files"]),
+        "request.total_size": sample_model.total_size,
+        "request.user_id": sample_request["user_id"],
+    }
+    traced_and_logged = " ".join([*(str(v) for v in span.attributes.values()), caplog.text])
+    assert sample_request["email"] not in traced_and_logged
+    assert sample_request["name"] not in traced_and_logged
+    assert sample_model.hash in caplog.text
+
+
+def test_publish_file_download_message_omits_missing_user_id(
+    sample_request: dict[str, Any],
+    sample_model: DownloadRequestModel,
+    mock_pubsub: tuple[Any, Any],
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    client, _ = mock_pubsub
+
+    publish_file_download_message(
+        sample_model.model_copy(update={"user_id": None}),
+        sample_request["topic_id"],
+        client,
+    )
+
+    (span,) = span_exporter.get_finished_spans()
+    assert "request.user_id" not in span.attributes
+
+
+@pytest.fixture
 def mock_session(mocker: MockerFixture) -> MagicMock:
     mock_sess = mocker.MagicMock()
     mocker.patch(
@@ -256,6 +318,26 @@ def test_send_notification_message_no_retry_on_non_network_error(
     mock_session.post.side_effect = ValueError("unexpected error")
 
     with pytest.raises(ValueError, match="unexpected error"):
+        send_notification_message(
+            name="John Doe",
+            user_id="user123",
+            email="john@example.com",
+            output_filename="output.zip",
+            manifest=["file1.txt"],
+            url="https://example.com/notify",
+        )
+
+    assert mock_session.post.call_count == 1
+
+
+def test_send_notification_message_raises_on_http_error_status(
+    mock_session: MagicMock,
+) -> None:
+    response = Response()
+    response.status_code = 500
+    mock_session.post.return_value = response
+
+    with pytest.raises(HTTPError):
         send_notification_message(
             name="John Doe",
             user_id="user123",

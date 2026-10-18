@@ -54,8 +54,9 @@ class DownloadRequestModel(BaseModel):
     name: str
     user_id: str | None = None
     email: str
+    # required with no default, since pydantic does not validate defaults, so an omitted
+    # list would otherwise skip the `min_length` check
     files: Annotated[list[DownloadRequestFileModel], AfterValidator(sort_files)] = Field(
-        default_factory=list,
         min_length=1,
     )
 

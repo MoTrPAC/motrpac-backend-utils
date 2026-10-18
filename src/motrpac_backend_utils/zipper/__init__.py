@@ -14,14 +14,16 @@ import logging
 import math
 import os
 import shutil
+import threading
 import time
 from concurrent.futures import Future, as_completed
+from contextlib import nullcontext
 from copy import deepcopy
 from datetime import UTC, datetime
 from multiprocessing import JoinableQueue, Process, Value
 from pathlib import Path
 from tempfile import SpooledTemporaryFile
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Self, TypedDict
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from google.cloud.storage import Client as StorageClient
@@ -40,6 +42,18 @@ if TYPE_CHECKING:
     from motrpac_backend_utils.zipper.cache import InProgressCache
 
 MAX_IN_PROGRESS = max((os.cpu_count() or 1) - 3, 1)
+# the longest an ack deadline extension can be, in seconds
+MAX_ACK_EXTENSION_SECONDS = 600
+# the shortest an ack deadline extension can be while work is ongoing, in seconds. An
+# extension of 0 would nack the message, so the remaining estimate is never used below this
+MIN_ACK_EXTENSION_SECONDS = 60
+# the shortest ack deadline Pub/Sub accepts without advising against it, in seconds
+MIN_ACK_DEADLINE_SECONDS = 10
+# how far each heartbeat extends a message's ack deadline, in seconds. The heartbeat runs
+# every half of this, so a crashed worker's message is redelivered within this time
+ACK_HEARTBEAT_SECONDS = 120
+# how long to wait for another download of the same file to make progress, in seconds
+DOWNLOAD_STALL_TIMEOUT_SECONDS = 300
 
 # setup local logging/Google Cloud Logging
 logger = logging.getLogger()
@@ -235,13 +249,122 @@ def estimate_remaining_time(
     :param current_file_count: The number of files that have been processed
     :param total_file_count: The total number of files to be processed
     :param elapsed_time: The time since the process started.
+    :return: The number of seconds to extend the ack deadline by, between
+        `MIN_ACK_EXTENSION_SECONDS` and `MAX_ACK_EXTENSION_SECONDS`. Work such as the zip
+        upload continues after every file is processed, so this is never 0.
     """
+    # without any processed files there is no rate to estimate from, so use the maximum
+    if current_file_count <= 0:
+        return MAX_ACK_EXTENSION_SECONDS
+
     # calculate the estimated time remaining
     remaining_time = (elapsed_time / current_file_count) * (
         total_file_count - current_file_count
     )
 
-    return min(math.ceil(remaining_time * 1.5), 600)
+    return max(
+        min(math.ceil(remaining_time * 1.5), MAX_ACK_EXTENSION_SECONDS),
+        MIN_ACK_EXTENSION_SECONDS,
+    )
+
+
+class AckDeadlineHeartbeat:
+    """
+    Keeps extending the ack deadline of a Pub/Sub message while work is ongoing.
+
+    Pub/Sub's subscriber client stops extending a message's lease after the subscriber's
+    `max_lease_duration`, and gaps between manual extensions (e.g. during the final upload)
+    let the deadline expire. While started, a background thread calls
+    `modify_ack_deadline(extension_seconds)` every `interval` seconds.
+
+    All extensions go through `extend`, which holds a lock and does nothing once `stop` was
+    called. Since `stop` takes the same lock, no extension is sent after `stop` returns, so
+    the message can then be acked or nacked safely. One-off extensions never shorten a
+    deadline set through `extend`. The periodic heartbeat always sends, so its schedule
+    alone keeps the deadline alive, whatever the subscriber client last sent.
+    """
+
+    def __init__(
+        self,
+        message: Message,
+        extension_seconds: int = ACK_HEARTBEAT_SECONDS,
+        interval: float | None = None,
+    ) -> None:
+        """
+        Create a heartbeat for a message, which does nothing until started.
+
+        :param message: The Pub/Sub message to extend the ack deadline of
+        :param extension_seconds: How far each heartbeat extends the deadline, between
+            `MIN_ACK_DEADLINE_SECONDS` and `MAX_ACK_EXTENSION_SECONDS`
+        :param interval: How often to extend the deadline, in seconds. Defaults to half of
+            `extension_seconds`.
+        """
+        self.message = message
+        self.extension_seconds = max(
+            min(extension_seconds, MAX_ACK_EXTENSION_SECONDS),
+            MIN_ACK_DEADLINE_SECONDS,
+        )
+        self.interval = self.extension_seconds / 2 if interval is None else interval
+        self._lock = threading.Lock()
+        self._stopped = threading.Event()
+        self._expires_at = 0.0
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        """Extend the deadline now, then keep extending it in a background thread."""
+        self.extend(self.extension_seconds, shorten=True)
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"ack-heartbeat-{self.message.message_id}",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def _run(self) -> None:
+        while not self._stopped.wait(self.interval):
+            self.extend(self.extension_seconds, shorten=True)
+
+    def extend(self, seconds: int, *, shorten: bool = False) -> bool:
+        """
+        Extend the ack deadline to `seconds` from now.
+
+        :param seconds: The new deadline, in seconds from now
+        :param shorten: Whether to send the extension even if it ends before a deadline
+            previously set through this method
+        :return: Whether the deadline was extended
+        """
+        with self._lock:
+            if self._stopped.is_set():
+                return False
+            expires_at = time.monotonic() + seconds
+            if not shorten and expires_at <= self._expires_at:
+                return False
+            try:
+                self.message.modify_ack_deadline(seconds)
+            except Exception:
+                logger.exception(
+                    "Failed to extend ack deadline of message %s",
+                    self.message.message_id,
+                )
+                return False
+            self._expires_at = expires_at
+            return True
+
+    def stop(self) -> None:
+        """Stop extending the deadline. No extension is sent after this returns."""
+        with self._lock:
+            self._stopped.set()
+        if self._thread is not None and self._thread is not threading.current_thread():
+            self._thread.join()
+
+    def __enter__(self) -> Self:
+        """Start the heartbeat."""
+        self.start()
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        """Stop the heartbeat, whether or not the work raised an exception."""
+        self.stop()
 
 
 class ZipUploadError(Exception):
@@ -276,6 +399,8 @@ class ZipUploader:
         requesters: list[Requester] | None = None,
         message: Message | None = None,
         ack_deadline: int = 600,
+        download_stall_timeout: float = DOWNLOAD_STALL_TIMEOUT_SECONDS,
+        ack_heartbeat_seconds: int = ACK_HEARTBEAT_SECONDS,
     ) -> None:
         """
         Initialize the ZipUploader class.
@@ -306,6 +431,12 @@ class ZipUploader:
             the process needs to extend the acknowledgement deadline of the message. Set this
             parameter to the acknowledgement deadline of the subscription. By default, it is
             set to 600 seconds.
+        :param download_stall_timeout: How long (in seconds) to wait for a partially
+            downloaded local file to grow before assuming its download was abandoned and
+            downloading it again.
+        :param ack_heartbeat_seconds: If a message is present, how far (in seconds) the
+            background heartbeat extends its ack deadline while the request is processed.
+            The heartbeat runs every half of this.
         """
         self.files = files
         self.file_hash = file_hash
@@ -326,9 +457,14 @@ class ZipUploader:
 
         # set up the storage client and input/output buckets
         self.storage_client = storage_client
+        self.input_bucket = None
+        self.output_bucket = None
         if self.storage_client is not None:
-            self.input_bucket = storage_client.get_bucket(input_bucket)
-            self.output_bucket = storage_client.get_bucket(output_bucket)
+            if input_bucket is not None:
+                self.input_bucket = storage_client.get_bucket(input_bucket)
+            if output_bucket is not None:
+                self.output_bucket = storage_client.get_bucket(output_bucket)
+        self.download_stall_timeout = download_stall_timeout
 
         # the queue to communicate with the separate zip file creation process
         self.queue: JoinableQueue[str | bool | BlobNotFoundError] = JoinableQueue()
@@ -340,7 +476,9 @@ class ZipUploader:
 
         # the message from the PubSub pull subscription if that is the source of the
         # ZipUploader
+        self.ack_heartbeat: AckDeadlineHeartbeat | None = None
         if self.message is not None:
+            self.ack_heartbeat = AckDeadlineHeartbeat(message, ack_heartbeat_seconds)
             deadline = datetime.fromtimestamp(message._received_timestamp, tz=UTC)  # noqa: SLF001
             # set some attributes on the message for our own tracking use
             message.ack_deadline = ack_deadline
@@ -390,28 +528,66 @@ class ZipUploader:
             # check if the file already exists
             if path.exists():
                 logger.debug("%s File already exists at %s", self.log_prefix, path)
-                # does size of remote and local file match (the file may be currently
-                # downloading)
-                if path.stat().st_size < blob_size:
+                # if it does exist but is currently downloading, wait
+                if self.wait_for_local_file(path, blob_size):
+                    return path
+                path.unlink(missing_ok=True)
+
+            logger.debug("%s Downloading file to %s", self.log_prefix, path)
+            blob.download_to_filename(str(path))
+            return path
+
+    def wait_for_local_file(self, path: Path, blob_size: int) -> bool:
+        """
+        Waits for another download of the same file to finish.
+
+        The wait ends when the local file reaches the size of the remote blob, or when it
+        stops growing for `download_stall_timeout` seconds.
+
+        :param path: The local path of the file being downloaded
+        :param blob_size: The size of the remote blob, in bytes
+        :return: True if the local file is complete, False if the other download was
+            abandoned and the file should be downloaded again
+        """
+        last_size = -1
+        last_progress = time.monotonic()
+        while True:
+            try:
+                current_size = path.stat().st_size
+            except FileNotFoundError:
+                logger.warning(
+                    "%s Partial file %s disappeared while waiting for it",
+                    self.log_prefix,
+                    path,
+                )
+                return False
+            if current_size >= blob_size:
+                if last_size >= 0:
+                    logger.debug(
+                        "%s Other process finished downloading %s",
+                        self.log_prefix,
+                        path,
+                    )
+                return True
+            if current_size != last_size:
+                if last_size < 0:
                     logger.debug(
                         "%s Waiting for other process to download %s",
                         self.log_prefix,
                         path,
                     )
-
-                # if it does exist but is currently downloading, wait
-                while path.stat().st_size < blob_size:
-                    time.sleep(1)
-                logger.debug(
-                    "%s Other process finished downloading %s",
+                last_size = current_size
+                last_progress = time.monotonic()
+            elif time.monotonic() - last_progress > self.download_stall_timeout:
+                logger.warning(
+                    "%s Download of %s stalled at %s / %s bytes, downloading it again",
                     self.log_prefix,
                     path,
+                    current_size,
+                    blob_size,
                 )
-                return path
-
-            logger.debug("%s Downloading file to %s", self.log_prefix, path)
-            blob.download_to_filename(str(path))
-            return path
+                return False
+            time.sleep(1)
 
     def create_zip(self) -> None:
         """
@@ -461,7 +637,7 @@ class ZipUploader:
             # subscription rather than receiving `Push`-ed messages), check if the time
             # is getting dangerously close to the timeout
             if self.message is not None:
-                self.check_message_deadline(i)
+                self.check_message_deadline(i + 1)
 
         # wait for the add to zip process to finish
         while True:
@@ -510,7 +686,13 @@ class ZipUploader:
                 self.log_prefix,
                 new_deadline,
             )
-            self.message.modify_ack_deadline(new_deadline)
+            # go through the heartbeat, so that this never races it, never shortens a
+            # deadline it set, and never extends after processing finished
+            if self.ack_heartbeat is not None:
+                if not self.ack_heartbeat.extend(new_deadline):
+                    return
+            else:
+                self.message.modify_ack_deadline(new_deadline)
             # reset the start time and new ack deadline
             self.message.ack_deadline = new_deadline
             self.message.ack_start_time = datetime.now(tz=UTC)
@@ -558,15 +740,25 @@ class ZipUploader:
         }
 
     def send_notification(self) -> None:
-        """Sends a notification to the user."""
+        """
+        Sends a notification to the user.
+
+        When an in-progress cache is used, each requester is removed from the cache as soon
+        as their notification is sent, so a retry only notifies the requesters that were
+        not notified yet. A failed notification does not stop the other requesters from
+        being notified.
+
+        :raises Exception: The first notification error, after every requester was tried
+        """
         if self.in_progress_cache is not None:
             self.requesters = list(
                 self.in_progress_cache.get_requesters(self.file_hash),
             )
         logger.debug("%s Sending notification to %s", self.log_prefix, self.requesters)
 
-        if len(self.requesters) > 0:
-            for requester in self.requesters:
+        first_error: Exception | None = None
+        for requester in self.requesters:
+            try:
                 send_notification_message(
                     requester.name,
                     requester.id,
@@ -575,13 +767,32 @@ class ZipUploader:
                     self.files,
                     self.notification_url,
                 )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("%s Failed to notify %s", self.log_prefix, requester)
+                first_error = first_error or e
+                continue
+            if self.in_progress_cache is not None:
+                self.in_progress_cache.remove_requester(self.file_hash, requester)
+
+        if first_error is not None:
+            raise first_error
 
     def notify_only(self) -> None:
         """
         Only notifies the users that have requested the file.
 
-        :return:
+        The zip file must already exist in the output bucket, so this requires the
+        `storage_client` and `output_bucket` parameters.
+
+        :raises ValueError: If no storage client or output bucket was given
+        :raises FileNotFoundError: If the zip file does not exist in the output bucket. No
+            notifications are sent in that case.
+        :raises NotificationError: If sending a notification fails
         """
+        if self.output_bucket is None:
+            msg = "notify_only requires a storage_client and output_bucket"
+            raise ValueError(msg)
+        self.check_zip_exists_in_bucket()
         try:
             self.send_notification()
         except Exception as e:
@@ -589,7 +800,17 @@ class ZipUploader:
         self.successful_result()
 
     def process_and_notify_requesters(self) -> None:
-        """Processes the request, constructs the zip archive to the storage bucket."""
+        """
+        Processes the request, constructs the zip archive to the storage bucket.
+
+        If a message is present, its ack deadline is extended in the background for the
+        whole request, including the final upload and the notifications. The extension
+        stops before this returns or raises, so the caller can then ack or nack it.
+        """
+        with self.ack_heartbeat or nullcontext():
+            self._process_and_notify_requesters()
+
+    def _process_and_notify_requesters(self) -> None:
         with tracer.start_as_current_span(self.file_hash):
             t1 = time.perf_counter()
             try:
@@ -599,6 +820,8 @@ class ZipUploader:
                 self.check_zip_exists_in_bucket()
             except Exception as e:
                 logger.exception("Exception occurred while processing files.")
+                if self.in_progress_cache is not None:
+                    self.in_progress_cache.fail_file(self.file_hash)
                 if self.tmp_dir_path:
                     shutil.rmtree(self.tmp_dir_path)
                 raise ZipUploadError from e

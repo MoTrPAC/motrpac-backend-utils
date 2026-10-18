@@ -52,13 +52,18 @@ def _send_notification(
     url: str,
     data: bytes,
 ) -> None:
-    """Post notification with retry logic for transient network failures."""
-    session.post(
+    """
+    Post notification with retry logic for transient network failures.
+
+    :raises requests.HTTPError: If the notifier responds with an error status code
+    """
+    response = session.post(
         url=url,
         data=data,
         headers={"Content-Type": "application/octet-stream"},
         timeout=_NOTIFICATION_TIMEOUT,
     )
+    response.raise_for_status()
 
 
 def decode_file_download_message(message: bytes) -> DownloadRequestModel:
@@ -75,6 +80,23 @@ def decode_file_download_message(message: bytes) -> DownloadRequestModel:
     except Error as e:
         msg = "Failed to decode protobuf message"
         raise ValueError(msg) from e
+
+
+def _request_trace_attributes(req: DownloadRequestModel) -> dict[str, str | int]:
+    """
+    Build log and span attributes for a request without personal information.
+
+    :param req: The download request
+    :return: The request hash, file count, total size, and user ID if present
+    """
+    attributes: dict[str, str | int] = {
+        "request.hash": req.hash,
+        "request.file_count": len(req.files),
+        "request.total_size": req.total_size,
+    }
+    if req.user_id:
+        attributes["request.user_id"] = req.user_id
+    return attributes
 
 
 def publish_file_download_message(
@@ -95,14 +117,17 @@ def publish_file_download_message(
         message = req.to_message()
         # Encode the data according to the message serialization type.
         msg_data = message.SerializeToString()
-        logger.debug("Preparing a binary-encoded message:\n%s", msg_data)
+        # the serialized message contains the requester's name and email, so only log
+        # and trace fields that do not identify the requester beyond their user ID
+        request_attributes = _request_trace_attributes(req)
+        logger.debug("Preparing a binary-encoded message: %s", request_attributes)
 
         tracer = trace.get_tracer(__name__)
 
         # Create a new span and yield it
         with tracer.start_as_current_span(
             f"{topic_id} publisher",
-            attributes={"data": str(msg_data)},
+            attributes=request_attributes,
         ) as span:
             try:
                 attrs = {
