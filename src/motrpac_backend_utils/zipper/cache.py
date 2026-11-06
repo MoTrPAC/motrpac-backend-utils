@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
+from enum import StrEnum
+from threading import RLock
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -57,8 +59,23 @@ class LastMessage:
         return self.diff > other
 
 
+class RequestAction(StrEnum):
+    """What the caller of `InProgressCache.register_request` must do with the request."""
+
+    PROCESS = "process"
+    """The caller must create the zip file, and nobody else is doing so."""
+    WAIT = "wait"
+    """The zip file is being created by another caller, who will notify the requester."""
+    NOTIFY = "notify"
+    """The zip file was already created, so the caller must only notify the requester."""
+
+
 class InProgressCache:
-    """Tracks which files are being processed in a multi-process environment."""
+    """
+    Tracks which files are being processed in a multi-process environment.
+
+    All methods are thread-safe, since Pub/Sub subscriber callbacks run concurrently.
+    """
 
     def __init__(
         self,
@@ -69,19 +86,48 @@ class InProgressCache:
         self.cache: defaultdict[str, RequesterSet] = defaultdict()
         self.atomic_in_progress: Value = atomic_in_progress
         self.atomic_processing_hashes = atomic_processing_hashes
+        self.lock = RLock()
+
+    def register_request(self, file_hash: str, requester: Requester) -> RequestAction:
+        """
+        Adds a requester and atomically decides how their request must be handled.
+
+        Only one caller gets `RequestAction.PROCESS` for a file hash until processing it
+        finishes or fails, so two requests for the same files never both create the zip.
+
+        :param file_hash: The hash of the requested files
+        :param requester: The requester of the files
+        :return: What the caller must do with the request
+        """
+        with self.lock:
+            requester_set = self.cache.get(file_hash)
+            if requester_set is None:
+                self.cache[file_hash] = RequesterSet(requester)
+                action = RequestAction.PROCESS
+            else:
+                requester_set.add_requester(requester)
+                if requester_set.is_in_progress():
+                    action = RequestAction.WAIT
+                elif requester_set.is_finished():
+                    action = RequestAction.NOTIFY
+                else:
+                    requester_set.resume()
+                    action = RequestAction.PROCESS
+            self.update_progress()
+            return action
 
     def add_requester(self, file_hash: str, requester: Requester) -> None:
         """
         Adds a filehash to the cache if it does not exist, otherwise it will add the requester.
 
+        If processing for the file hash previously failed, the hash is marked as in progress
+        again, since a new request for it means it will be retried. To also decide whether
+        the caller should process the files, use `register_request`.
+
         :param file_hash: The file to add
         :param requester: The requester of the file
         """
-        if file_hash not in self.cache:
-            self.cache[file_hash] = RequesterSet(requester)
-        else:
-            self.cache[file_hash].add_requester(requester)
-        self.update_progress()
+        self.register_request(file_hash, requester)
 
     def finish_file(self, file_hash: str) -> None:
         """
@@ -89,8 +135,23 @@ class InProgressCache:
 
         :param file_hash: The fileHash to signal as completed processing.
         """
-        self.cache[file_hash].finish()
-        self.update_progress()
+        with self.lock:
+            self.cache[file_hash].finish()
+            self.update_progress()
+
+    def fail_file(self, file_hash: str) -> None:
+        """
+        Signals that processing the fileHash failed.
+
+        The hash is no longer considered in progress, but its requesters are kept so that
+        they are all notified when processing is retried and succeeds.
+
+        :param file_hash: The fileHash to signal as failed.
+        """
+        with self.lock:
+            if file_hash in self.cache:
+                self.cache[file_hash].fail()
+            self.update_progress()
 
     def get_requesters(self, file_hash: str) -> list[Requester]:
         """
@@ -98,19 +159,23 @@ class InProgressCache:
 
         :param file_hash: The set of files to get the requesters of
         """
-        return self.cache[file_hash].get_requesters()
+        with self.lock:
+            return self.cache[file_hash].get_requesters()
 
     def remove_requester(self, file_hash: str, requester: Requester) -> None:
         """
         Removes the requesters from the cache after the request for notification has been made.
 
+        Removing the last requester does not change whether the file hash is in progress.
+
         :param file_hash: The fileHash to remove the requesters of
         :param requester: The requester to remove
         """
-        requester_set = self.cache[file_hash]
-        if requester_set is not None:
-            requester_set.remove_requester(requester)
-        self.update_progress()
+        with self.lock:
+            requester_set = self.cache.get(file_hash)
+            if requester_set is not None:
+                requester_set.remove_requester(requester)
+            self.update_progress()
 
     def is_processed(self, file_hash: str) -> bool:
         """
@@ -119,7 +184,8 @@ class InProgressCache:
         :param file_hash: The file hash to check
         :return: Whether the hash is in the cache
         """
-        return file_hash in self.cache
+        with self.lock:
+            return file_hash in self.cache
 
     def file_is_in_progress(self, file_hash: str) -> bool:
         """
@@ -128,7 +194,18 @@ class InProgressCache:
         :param file_hash: The file hash to check
         :return: Whether the file processing is in progress
         """
-        return self.is_processed(file_hash) and self.cache[file_hash].is_in_progress()
+        with self.lock:
+            return self.is_processed(file_hash) and self.cache[file_hash].is_in_progress()
+
+    def file_is_finished(self, file_hash: str) -> bool:
+        """
+        Gets whether the file processing for a particular file hash finished successfully.
+
+        :param file_hash: The file hash to check
+        :return: Whether the zip file for the file hash was created
+        """
+        with self.lock:
+            return self.is_processed(file_hash) and self.cache[file_hash].is_finished()
 
     def update_progress(self) -> None:
         """
@@ -138,19 +215,20 @@ class InProgressCache:
         are shared across processes and used to determine if the program should continue
         to run.
         """
-        is_in_progress = False
-        tmp_in_progress = []
+        with self.lock:
+            is_in_progress = False
+            tmp_in_progress = []
 
-        for f_hash, cache in self.cache.items():
-            if cache.is_in_progress():
-                is_in_progress = True
-                tmp_in_progress.append(f_hash)
+            for f_hash, cache in self.cache.items():
+                if cache.is_in_progress():
+                    is_in_progress = True
+                    tmp_in_progress.append(f_hash)
 
-        # Set the atomic boolean
-        self.atomic_in_progress.value = int(is_in_progress)
+            # Set the atomic boolean
+            self.atomic_in_progress.value = int(is_in_progress)
 
-        # Set the atomic array
-        self.atomic_processing_hashes.value = (",".join(tmp_in_progress)).encode()
+            # Set the atomic array
+            self.atomic_processing_hashes.value = (",".join(tmp_in_progress)).encode()
 
 
 class RequesterSet:
@@ -158,6 +236,7 @@ class RequesterSet:
 
     requesters: set[Requester]
     finished: bool
+    failed: bool
 
     def __init__(self, new_requester: Requester) -> None:
         """
@@ -166,6 +245,7 @@ class RequesterSet:
         :param new_requester: The requester of the file
         """
         self.finished = False
+        self.failed = False
         self.requesters = set()
         self.requesters.add(new_requester)
 
@@ -191,9 +271,7 @@ class RequesterSet:
 
         :param requester: The requester to remove
         """
-        self.requesters.remove(requester)
-        if len(self.requesters) == 0:
-            self.finished = True
+        self.requesters.discard(requester)
 
     def is_in_progress(self) -> bool:
         """
@@ -201,12 +279,35 @@ class RequesterSet:
 
         :return: Whether the file processing is in progress
         """
-        return not self.finished
+        return not self.finished and not self.failed
+
+    def is_finished(self) -> bool:
+        """
+        Gets whether the file processing finished successfully.
+
+        :return: Whether the file processing finished successfully
+        """
+        return self.finished
+
+    def has_failed(self) -> bool:
+        """
+        Gets whether the file processing failed.
+
+        :return: Whether the file processing failed
+        """
+        return self.failed
 
     def resume(self) -> None:
         """Signals the file hash has not been processed."""
         self.finished = False
+        self.failed = False
 
     def finish(self) -> None:
         """Signals the file hash has been processed."""
         self.finished = True
+        self.failed = False
+
+    def fail(self) -> None:
+        """Signals that processing the file hash failed."""
+        self.finished = False
+        self.failed = True
